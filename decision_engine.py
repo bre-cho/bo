@@ -67,6 +67,22 @@ except ImportError as _e:
     _HAS_SSOL = False
     print(f"[Engine] Sovereign Oversight Layer not available: {_e}")
 
+# ── Empire Control Layer (lazy-loaded) ────────────────────────────
+try:
+    from empire_control import EmpireControlLayer
+    _HAS_EMPIRE = True
+except ImportError as _e:
+    _HAS_EMPIRE = False
+    print(f"[Engine] Empire Control Layer not available: {_e}")
+
+# ── Autonomous Evolution Engine (lazy-loaded) ──────────────────────
+try:
+    from autonomous_evolution import AutonomousEvolutionEngine
+    _HAS_AEE = True
+except ImportError as _e:
+    _HAS_AEE = False
+    print(f"[Engine] Autonomous Evolution Engine not available: {_e}")
+
 
 # ──────────────────────────────────────────────────────────────────
 # System state enum
@@ -143,6 +159,18 @@ class DecisionEngine:
             self._ssol = SovereignOversightLayer()
         else:
             self._ssol = None
+
+        # ── Empire Control Layer ───────────────────────────────────
+        if _HAS_EMPIRE and getattr(config, "EMPIRE_ENABLED", True):
+            self._empire = EmpireControlLayer()
+        else:
+            self._empire = None
+
+        # ── Autonomous Evolution Engine ────────────────────────────
+        if _HAS_AEE and getattr(config, "AEE_ENABLED", True):
+            self._aee = AutonomousEvolutionEngine()
+        else:
+            self._aee = None
 
         # ── Cold-start synthetic training ─────────────────────────
         if config.ML_ENABLED and config.SYNTH_COLD_START:
@@ -806,7 +834,77 @@ class DecisionEngine:
         except Exception as exc:
             print(f"  👑 [SSOL] Lỗi: {exc}")
 
-    # ── Dashboard ─────────────────────────────────────────────────
+    # ── ⑩ empire control ──────────────────────────────────────────
+
+    def trigger_empire_control(self) -> None:
+        """
+        Chạy một chu kỳ SSCL (Strategic Sovereign Control Layer).
+
+        Quy trình:
+          1. Thu thập telemetry per-cluster
+          2. Tính portfolio-theoretic attention allocation (Sharpe-based)
+          3. Tính Network Dominance Score
+          4. Phát hiện merge opportunities
+          5. Đánh giá empire objectives met/missed
+          6. Lưu báo cáo vào Redis
+
+        SSCL luôn chạy "advisory" — không tự modify active_symbols
+        (dùng SSOL cho enforcement). SSCL bổ sung portfolio intelligence.
+        """
+        if self._empire is None:
+            return
+
+        print(f"\n  🌐 [SSCL] Chạy empire control cycle #{self._cycle_count}...")
+        try:
+            report = self._empire.run(
+                active_symbols=list(self._active_symbols),
+                verbose=True,
+            )
+            print(
+                f"  🌐 [SSCL] Phase={report.empire_phase}  "
+                f"Dominance={report.dominance_score:.2f}  "
+                f"Entropy={report.attention_entropy:.2f}bits  "
+                f"Merges={len(report.merge_proposals)}"
+            )
+        except Exception as exc:
+            print(f"  🌐 [SSCL] Lỗi: {exc}")
+
+    # ── ⑪ autonomous evolution ────────────────────────────────────
+
+    def trigger_autonomous_evolution(self) -> None:
+        """
+        Chạy một chu kỳ AEE (Autonomous Evolution Engine).
+
+        Quy trình:
+          1. Phát hiện điểm yếu (WeaknessDetector)
+          2. Sinh hypothesis cải tiến (HypothesisGenerator)
+          3. Tạo mutations (MutationFactory)
+          4. Đánh giá mutations vs baseline (MutationEvaluator)
+          5. Kiểm tra an toàn (SafeEvolutionGate)
+          6. Apply mutations đã pass nếu AEE_DRY_RUN=False
+
+        Trong dry-run mode (AEE_DRY_RUN=True, default):
+          - Phát hiện + đánh giá nhưng không apply
+          - Báo cáo cho operator biết mutations nào sẽ được apply
+        """
+        if self._aee is None:
+            return
+
+        print(f"\n  🧬 [AEE] Chạy autonomous evolution cycle #{self._cycle_count}...")
+        try:
+            report = self._aee.run(
+                cycle_count=self._cycle_count,
+                verbose=True,
+            )
+            print(
+                f"  🧬 [AEE] Weaknesses={report.n_weaknesses}  "
+                f"Proposals={report.n_proposals}  "
+                f"Passed={report.n_passed}  "
+                f"Applied={len(report.applied_mutations)}  "
+                f"Safety={report.evolution_safety:.1%}"
+            )
+        except Exception as exc:
+            print(f"  🧬 [AEE] Lỗi: {exc}")
 
     def print_dashboard(self, balance: float, mode: SystemMode) -> None:
         """In dashboard giám sát cho operator."""
@@ -864,6 +962,17 @@ class DecisionEngine:
             ssol_in = ssol_interval - (self._cycle_count % ssol_interval)
             shadow  = "shadow" if getattr(config, "SSOL_SHADOW_MODE", True) else "enforce"
             print(f"  SSOL👑   : mode={shadow}  next_in={ssol_in} cycles")
+        # Empire Control Layer summary
+        if self._empire is not None:
+            emp_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+            emp_in = emp_interval - (self._cycle_count % max(emp_interval, 1))
+            print(f"  SSCL🌐   : empire_control  next_in={emp_in} cycles")
+        # Autonomous Evolution Engine summary
+        if self._aee is not None:
+            aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
+            aee_in  = aee_interval - (self._cycle_count % max(aee_interval, 1))
+            dry_tag = "dry-run" if getattr(config, "AEE_DRY_RUN", True) else "live"
+            print(f"  AEE🧬    : mode={dry_tag}  next_in={aee_in} cycles")
 
     # ── Master run loop ───────────────────────────────────────────
 
@@ -904,6 +1013,19 @@ class DecisionEngine:
         print(
             f"  SSOL👑          : {ssol_status}  mode={ssol_mode}  "
             f"interval={ssol_interval} cycles"
+        )
+        empire_status = "enabled" if self._empire is not None else "disabled"
+        empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+        print(
+            f"  SSCL🌐          : {empire_status}  "
+            f"interval={empire_interval} cycles"
+        )
+        aee_status = "enabled" if self._aee is not None else "disabled"
+        aee_mode   = ("dry-run" if getattr(config, "AEE_DRY_RUN", True) else "live") if self._aee else "n/a"
+        aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
+        print(
+            f"  AEE🧬           : {aee_status}  mode={aee_mode}  "
+            f"interval={aee_interval} cycles"
         )
         print("=" * 65)
 
@@ -958,6 +1080,16 @@ class DecisionEngine:
                     ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
                     if ssol_interval > 0 and self._cycle_count % ssol_interval == 0:
                         self.trigger_sovereign_oversight()
+
+                    # ⑩ empire control (mỗi EMPIRE_CYCLE_INTERVAL chu kỳ)
+                    empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+                    if empire_interval > 0 and self._cycle_count % empire_interval == 0:
+                        self.trigger_empire_control()
+
+                    # ⑪ autonomous evolution (mỗi AEE_CYCLE_INTERVAL chu kỳ)
+                    aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
+                    if aee_interval > 0 and self._cycle_count % aee_interval == 0:
+                        self.trigger_autonomous_evolution()
 
                     # ④ tự hành động — qua pipeline
                     self.run_live_cycle(balance=balance)

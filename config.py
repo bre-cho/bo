@@ -460,3 +460,79 @@ REDIS_SSOL_REPORT_KEY         = "Deriv_SSOL_Report"
 REDIS_SSOL_VERDICTS_KEY       = "Deriv_SSOL_Verdicts"
 REDIS_SSOL_MEMORY_KEY         = "Deriv_SSOL_Memory"
 REDIS_SSOL_QUARANTINE_KEY     = "Deriv_SSOL_Quarantine"
+
+# ============================================================
+# EMPIRE CONTROL LAYER — Strategic Sovereign Control (SSCL)
+# ============================================================
+# Bật/tắt SSCL (Strategic Sovereign Control Layer)
+EMPIRE_ENABLED                 = True
+# Chạy SSCL mỗi N chu kỳ engine (0 = tắt auto-run)
+EMPIRE_CYCLE_INTERVAL          = 100
+
+# DominanceTracker: win rate lý thuyết tối đa trong điều kiện thị trường
+EMPIRE_THEORETICAL_MAX_WIN_RATE = 0.75
+
+# AttentionPortfolio
+# Risk-free win rate baseline cho Sharpe calculation
+EMPIRE_RISK_FREE_WIN_RATE       = 0.50
+# Minimum attention fraction mỗi cluster nhận trong portfolio
+EMPIRE_MIN_ATTENTION_FRACTION   = 0.05
+# Temperature parameter điều chỉnh độ tập trung của softmax allocation
+# Cao → phân bổ đều hơn; Thấp → winner-take-all
+EMPIRE_PORTFOLIO_TEMPERATURE    = 2.0
+
+# MergeAdvisor
+# Ngưỡng synergy tối thiểu để đề xuất merge
+EMPIRE_MERGE_MIN_SYNERGY        = 0.05
+
+# Redis keys cho SSCL
+REDIS_EMPIRE_REPORT_KEY         = "Deriv_Empire_Report"
+REDIS_EMPIRE_HISTORY_KEY        = "Deriv_Empire_History"
+
+# ============================================================
+# AUTONOMOUS EVOLUTION ENGINE (AEE)
+# ============================================================
+# Bật/tắt AEE hoàn toàn
+AEE_ENABLED                     = True
+# Dry-run: True = detect + evaluate nhưng KHÔNG apply
+#          False = apply mutations đã pass gate (phase 3)
+AEE_DRY_RUN                     = True
+# Chạy AEE mỗi N chu kỳ engine (0 = tắt auto-run)
+AEE_CYCLE_INTERVAL              = 200
+
+# WeaknessDetector thresholds
+# Win rate dưới ngưỡng này → weakness LOW_WIN_RATE
+AEE_WR_WEAKNESS_THRESHOLD       = 0.52
+# Max drawdown vượt ngưỡng này → weakness HIGH_DRAWDOWN
+AEE_DD_WEAKNESS_THRESHOLD       = 0.15
+# Pipeline rejection rate vượt ngưỡng này → weakness HIGH_REJECTION_RATE
+AEE_REJECT_WEAKNESS_THRESHOLD   = 0.60
+# Số chu kỳ không cập nhật genome → weakness STALE_GENOME
+AEE_STALE_GENOME_CYCLES         = 100
+# Số lệnh tối thiểu để phân tích điểm yếu
+AEE_MIN_TRADES_FOR_ANALYSIS     = 20
+# Số lần thua liên tiếp → weakness CONSECUTIVE_LOSS
+AEE_CONSEC_LOSS_THRESHOLD       = 5
+
+# MutationEvaluator
+# Số synthetic environments để đánh giá mỗi mutation
+AEE_N_EVAL_ENVS                 = 4
+
+# SafeEvolutionGate thresholds
+# Win rate phải cải thiện ít nhất % này để pass
+AEE_MIN_WIN_RATE_IMPROVEMENT    = 0.005
+# Profit factor phải cải thiện ít nhất X để pass (OR với WR)
+AEE_MIN_PF_IMPROVEMENT          = 0.05
+# Drawdown không được tăng quá % này
+AEE_MAX_DD_INCREASE             = 0.05
+# Confidence tối thiểu (dựa trên n_trades evaluated)
+AEE_MIN_CONFIDENCE              = 0.20
+
+# EvolutionMemory
+# Số mutation history entries tối đa lưu trong Redis
+AEE_MEMORY_MAX_ENTRIES          = 500
+
+# Redis keys cho AEE
+REDIS_AEE_REPORT_KEY            = "Deriv_AEE_Report"
+REDIS_AEE_MEMORY_KEY            = "Deriv_AEE_Memory"
+REDIS_AEE_APPLIED_KEY           = "Deriv_AEE_Applied"

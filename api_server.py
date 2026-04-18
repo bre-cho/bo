@@ -952,6 +952,152 @@ def create_app():
             ),
         }
 
+    # ── Empire Control Layer (SSCL) ───────────────────────────────
+
+    @app.get("/empire/report")
+    async def empire_report():
+        """
+        Return latest Empire Control Layer report:
+          dominance_score, attention_allocation, merge_proposals,
+          portfolio_efficiency, objectives met/missed, insights.
+        """
+        try:
+            from empire_control import get_empire_report
+            return get_empire_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class EmpireRunRequest(BaseModel):
+        symbols : List[str] = []
+        verbose : bool      = False
+
+    @app.post("/empire/run")
+    async def empire_run(req: EmpireRunRequest):
+        """
+        Trigger a full SSCL cycle on demand.
+
+        symbols: list of cluster IDs (defaults to config.SCAN_SYMBOLS).
+        Returns full empire report with attention allocation and merge proposals.
+        """
+        try:
+            from empire_control import run_empire_cycle
+            symbols = req.symbols or list(config.SCAN_SYMBOLS)
+            report  = run_empire_cycle(active_symbols=symbols, verbose=req.verbose)
+            return {
+                "status"              : "ok",
+                "empire_phase"        : report.empire_phase,
+                "dominance_score"     : report.dominance_score,
+                "network_health_score": report.network_health_score,
+                "attention_entropy"   : report.attention_entropy,
+                "portfolio_efficiency": report.portfolio_efficiency,
+                "attention_allocation": report.attention_allocation,
+                "merge_proposals"     : report.merge_proposals,
+                "objective"           : report.objective,
+                "objectives_met"      : report.objectives_met,
+                "objectives_missed"   : report.objectives_missed,
+                "insights"            : report.insights,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/empire/history")
+    async def empire_history(n: int = Query(default=50, ge=1, le=200)):
+        """
+        Return SSCL history: dominance_score + entropy trend over last N cycles.
+        """
+        try:
+            from empire_control import get_empire_history
+            history = get_empire_history(n=n)
+            return {"status": "ok", "n": len(history), "history": history}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── Autonomous Evolution Engine (AEE) ─────────────────────────
+
+    @app.get("/evolution/aee/report")
+    async def aee_report():
+        """
+        Return latest Autonomous Evolution Engine report:
+          weaknesses, proposals, results, applied_mutations,
+          evolution_safety, insights.
+        """
+        try:
+            from autonomous_evolution import get_aee_report
+            return get_aee_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class AEERunRequest(BaseModel):
+        verbose     : bool = False
+        cycle_count : int  = 0
+
+    @app.post("/evolution/aee/run")
+    async def aee_run(req: AEERunRequest):
+        """
+        Trigger a full AEE cycle on demand.
+
+        Respects AEE_DRY_RUN from config.
+        Set dry_run=false via /evolution/aee/mode first to enable apply.
+        """
+        try:
+            from autonomous_evolution import run_autonomous_evolution
+            report = run_autonomous_evolution(
+                cycle_count=req.cycle_count,
+                verbose=req.verbose,
+            )
+            return {
+                "status"           : "ok",
+                "n_weaknesses"     : report.n_weaknesses,
+                "n_proposals"      : report.n_proposals,
+                "n_passed"         : report.n_passed,
+                "n_rejected"       : report.n_rejected,
+                "n_blocked"        : report.n_blocked,
+                "weaknesses"       : report.weaknesses[:5],
+                "applied_mutations": report.applied_mutations,
+                "evolution_safety" : report.evolution_safety,
+                "insights"         : report.insights,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/evolution/aee/memory")
+    async def aee_memory(n: int = Query(default=20, ge=1, le=100)):
+        """
+        Return recent evolution mutation history from AEE memory.
+
+        Gồm mutations đã pass, reject, blocked — dùng để phân tích
+        evolution trajectory và tránh lặp lại thất bại.
+        """
+        try:
+            from autonomous_evolution import EvolutionMemory
+            mem    = EvolutionMemory()
+            history = mem.get_recent(n=n)
+            return {"status": "ok", "n": len(history), "history": history}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class AEEModeRequest(BaseModel):
+        dry_run: bool
+
+    @app.post("/evolution/aee/mode")
+    async def aee_set_mode(req: AEEModeRequest):
+        """
+        Toggle AEE dry-run mode.
+
+        dry_run=True  → detect + evaluate, không apply (safe default)
+        dry_run=False → apply mutations đã pass gate (phase 3)
+        """
+        config.AEE_DRY_RUN = req.dry_run
+        return {
+            "status" : "ok",
+            "dry_run": config.AEE_DRY_RUN,
+            "message": (
+                "Dry-run ON — mutations chỉ được đánh giá, không áp dụng"
+                if req.dry_run
+                else "Live mode ON — mutations đã pass gate sẽ được áp dụng ngay"
+            ),
+        }
+
     return app
 
 

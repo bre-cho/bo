@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-04-18T10:19:38.739926",
+  "empire_phase": "REBALANCE",
+  "dominance_score": 0.0,
+  "network_health_score": 0.5,
+  "attention_entropy": 1.0,
+  "objective": {
+    "target_dominance_score": 0.7,
+    "target_win_rate": 0.6,
+    "target_pf": 1.4,
+    "target_attention_entropy": 1.5,
+    "growth_horizon_cycles": 100
+  },
+  "attention_allocation": [
+    {
+      "cluster_id": "R_10",
+      "score": 0.5,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "drawdown_pct": 0.0,
+      "n_trades": 0,
+      "regime": "unknown",
+      "sharpe_attention": 0.0,
+      "momentum_factor": 1.0,
+      "current_allocation": 0.0,
+      "recommended_alloc": 0.5,
+      "delta_alloc": 0.5
+    },
+    {
+      "cluster_id": "R_100",
+      "score": 0.5,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "drawdown_pct": 0.0,
+      "n_trades": 0,
+      "regime": "unknown",
+      "sharpe_attention": 0.0,
+      "momentum_factor": 1.0,
+      "current_allocation": 0.0,
+      "recommended_alloc": 0.5,
+      "delta_alloc": 0.5
+    }
+  ],
+  "merge_proposals": [],
+  "portfolio_efficiency": 0.0,
+  "insights": [
+    "Empire phase: REBALANCE | Network dominance: 0.0% | Portfolio entropy: 1.00 bits",
+    "Network perf: WR=0.0%  PF=0.00",
+    "\ud83d\udcb0 Top attention: R_10 (sharpe=0.000 \u2192 alloc=50.0%)",
+    "\ud83d\udcc9 Lowest attention: R_100 (sharpe=0.000 \u2192 alloc=50.0%)",
+    "\ud83d\udd04 Portfolio rebalance needed: R_10(+50.0%), R_100(+50.0%)",
+    "\u274c Objectives missed: dominance_score, network_win_rate, network_pf, attention_entropy"
+  ],
+  "objectives_met": [],
+  "objectives_missed": [
+    "dominance_score: 0.000 (target=0.700, gap=-100.0%) \u274c",
+    "network_win_rate: 0.000 (target=0.600, gap=-100.0%) \u274c",
+    "network_pf: 0.000 (target=1.400, gap=-100.0%) \u274c",
+    "attention_entropy: 1.000 (target=1.500, gap=-33.3%) \u274c"
+  ]
+}
