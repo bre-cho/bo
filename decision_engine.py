@@ -48,6 +48,17 @@ from pipeline     import (
 )
 import deriv_data
 
+# ── New components (lazy-loaded to avoid hard dependency) ─────────
+try:
+    from control_system     import ControlSystem
+    from capital_strategy   import CapitalStrategyManager
+    from candle_library     import CandleLibraryManager
+    from model_registry     import ModelRegistry
+    _HAS_NEW_COMPONENTS = True
+except ImportError as _e:
+    _HAS_NEW_COMPONENTS = False
+    print(f"[Engine] New components not available: {_e}")
+
 
 # ──────────────────────────────────────────────────────────────────
 # System state enum
@@ -105,6 +116,19 @@ class DecisionEngine:
         self._mode               = self._load_mode()
         self._cycle_count        = 0
 
+        # ── New components ────────────────────────────────────────
+        if _HAS_NEW_COMPONENTS:
+            self.control      = ControlSystem()
+            self.cap_strat    = CapitalStrategyManager()
+            self.candle_lib   = CandleLibraryManager(self._active_symbols)
+            self.model_reg    = ModelRegistry()
+            self.candle_lib.load_all()  # Load cached libraries on startup
+        else:
+            self.control   = None
+            self.cap_strat = None
+            self.candle_lib= None
+            self.model_reg = None
+
     # ── Persistence ───────────────────────────────────────────────
 
     def _load_mode(self) -> SystemMode:
@@ -141,12 +165,19 @@ class DecisionEngine:
         Quyết định hệ thống nên làm gì trong chu kỳ này.
 
         Ưu tiên:
-          PAUSED   : khi risk gate block giao dịch
+          PAUSED   : khi risk gate block giao dịch hoặc ControlSystem stop
           LEARNING : khi đủ history và đến kỳ học lại
           PAPER    : khi mode hiện tại là PAPER
           LIVE     : trạng thái bình thường
         """
-        # Kiểm tra risk gate trước
+        # Kiểm tra ControlSystem daily TP/SL trước
+        if self.control is not None:
+            ctrl_ok, ctrl_reason = self.control.can_trade(daily_pnl=self.risk.state.daily_pnl)
+            if not ctrl_ok:
+                print(f"  [ControlSystem] 🛑 {ctrl_reason}")
+                return SystemMode.PAUSED
+
+        # Kiểm tra risk gate
         allowed, _ = self.risk.can_trade(balance=balance)
         if not allowed:
             return SystemMode.PAUSED
@@ -294,9 +325,11 @@ class DecisionEngine:
                 # ② tự quyết định — tính win_prob + confidence
                 should_enter, pred = self.decide_entry(best, df, balance)
 
-                # Tính stake
+                # Tính stake — ưu tiên CapitalStrategyManager nếu có
                 if pred and pred.stake_suggestion > 0:
                     stake = pred.stake_suggestion
+                elif self.cap_strat is not None:
+                    stake = self.cap_strat.next_stake(balance, best.score)
                 else:
                     params = self.learner.get_params()
                     stake  = round(
@@ -418,6 +451,13 @@ class DecisionEngine:
         if features is not None:
             self.memory.record_outcome(features, won=won, pnl=pnl)
 
+        # ── Cập nhật CapitalStrategyManager ──────────────────────
+        if self.cap_strat is not None:
+            try:
+                self.cap_strat.update(won=won, pnl=pnl)
+            except Exception:
+                pass
+
         signal = trade.signal_ref
         record = TradeRecord(
             timestamp    = ts.isoformat(),
@@ -494,6 +534,28 @@ class DecisionEngine:
             print(f"  🧠 [Learning] ⚠️  Lỗi: {exc}")
         finally:
             self._save_mode(prev_mode)
+
+        # ── ML Model retrain (if enabled and enough data) ─────────
+        if config.ML_ENABLED and self._cycle_count % config.ML_RETRAIN_INTERVAL == 0:
+            try:
+                from ml_models import EnsembleScorer
+                import json as _json
+                raw_history = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
+                trade_history = [_json.loads(r) for r in raw_history]
+                # Use candle library if available, else fetch fresh
+                if self.candle_lib is not None:
+                    df = self.candle_lib.get(config.SYMBOL).get_dataframe()
+                else:
+                    df = deriv_data.fetch_candles(count=config.SIM_CANDLE_COUNT)
+                if df is not None and not df.empty:
+                    scorer = EnsembleScorer()
+                    scorer.retrain_all(df, trade_history)
+                    # Register new versions
+                    if self.model_reg is not None:
+                        self.model_reg.register("win_classifier", n_train=len(trade_history), train_score=0.0)
+                    print(f"  🤖 [ML] Retrain complete ({len(trade_history)} trade samples)")
+            except Exception as exc:
+                print(f"  🤖 [ML] Retrain failed: {exc}")
 
     # ── ⑦ tự mô phỏng on-demand ──────────────────────────────────
 
@@ -593,6 +655,16 @@ class DecisionEngine:
             f"(block_threshold≥{config.MEMORY_HARD_BLOCK_LOSS_RATE*100:.0f}% loss  "
             f"min_samples={config.MEMORY_MIN_SAMPLES_FOR_RULE})"
         )
+        # Control System + Capital Strategy
+        if self.control is not None:
+            print(f"  Control  : {self.control.summary()}")
+        if self.cap_strat is not None:
+            cs = self.cap_strat.status()
+            print(
+                f"  CapStrat : {cs['strategy']}  base=${cs['base_stake']}  "
+                f"W-streak={cs['consecutive_win']}  L-streak={cs['consecutive_loss']}  "
+                f"PnL={cs['cycle_pnl']:+.2f}"
+            )
 
     # ── Master run loop ───────────────────────────────────────────
 
