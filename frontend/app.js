@@ -333,6 +333,76 @@ function appendChat(role, text) {
   box.scrollTop = box.scrollHeight;
 }
 
+// ── Synthetic Engine ─────────────────────────────────────────────
+async function runSyntheticTrain() {
+  const n      = parseInt(document.getElementById('synth-n-per-regime').value) || 150;
+  const blend  = document.getElementById('synth-blend-real').checked;
+  const btn    = document.getElementById('synth-train-btn');
+  const prog   = document.getElementById('synth-train-progress');
+  const label  = document.getElementById('synth-progress-label');
+
+  btn.disabled = true;
+  prog.style.display = '';
+  label.textContent  = 'Đang tạo dữ liệu tổng hợp...';
+
+  const result = await apiPost('/synthetic/train', {
+    n_per_regime: n,
+    blend_real_data: blend,
+  });
+
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  const card = document.getElementById('synth-result-card');
+  const body = document.getElementById('synth-result-body');
+  card.style.display = '';
+
+  if (result && result.status === 'ok') {
+    const m = result.metrics || {};
+    body.innerHTML = `
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <span class="badge bg-success">✅ Hoàn thành</span>
+        <span class="badge bg-info">AUC: ${(m.win_clf_auc || 0).toFixed(4)}</span>
+        <span class="badge bg-primary">Mẫu: ${m.n_samples || '--'}</span>
+        <span class="badge ${m.lstm_trained ? 'bg-success' : 'bg-secondary'}">LSTM: ${m.lstm_trained ? 'OK' : 'Bỏ qua'}</span>
+      </div>
+      <div class="text-muted small">
+        Model đã lưu → dùng cho inference ngay lệnh tiếp theo.<br>
+        Bật <code>ML_ENABLED=True</code> trong config.py để kích hoạt.
+      </div>`;
+    showToast('Synthetic training hoàn thành!', 'success');
+  } else {
+    body.innerHTML = `<div class="text-danger">Lỗi training. Kiểm tra console server.</div>`;
+    showToast('Lỗi synthetic training', 'danger');
+  }
+}
+
+async function previewSyntheticData() {
+  const n = parseInt(document.getElementById('synth-n-per-regime').value) || 50;
+  const result = await apiGet(`/synthetic/demo?n_per_regime=${Math.min(n, 50)}`);
+  const card = document.getElementById('synth-preview-card');
+  const body = document.getElementById('synth-preview-body');
+  card.style.display = '';
+
+  if (result) {
+    const wr = result.win_rate_pct || 0;
+    const wrClass = wr >= 48 && wr <= 52 ? 'text-success' : wr > 55 ? 'text-warning' : 'text-info';
+    body.innerHTML = `
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <span class="badge bg-dark border border-secondary">Tổng: ${result.n_samples}</span>
+        <span class="badge bg-dark border border-secondary ${wrClass}">Win: ${result.win_rate_pct}%</span>
+        <span class="badge bg-dark border border-secondary">Features: ${result.n_features}</span>
+        <span class="badge bg-success bg-opacity-25">Win: ${result.n_wins}</span>
+        <span class="badge bg-danger bg-opacity-25">Loss: ${result.n_losses}</span>
+      </div>
+      <div class="text-muted small">
+        ${result.feature_names ? result.feature_names.slice(0, 10).join(', ') + '...' : ''}
+      </div>`;
+  } else {
+    body.innerHTML = `<div class="text-muted small">Không lấy được preview — server chưa chạy?</div>`;
+  }
+}
+
 // ── Utilities ─────────────────────────────────────────────────────
 function setText(id, v) {
   const el = document.getElementById(id);

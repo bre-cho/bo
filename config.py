@@ -294,3 +294,16 @@ API_HOST                 = "0.0.0.0"
 API_PORT                 = 8000
 API_SECRET_KEY           = "changeme_in_env"   # JWT secret
 API_CORS_ORIGINS         = ["http://localhost:3000", "http://localhost:8000"]
+
+# ============================================================
+# SYNTHETIC SIGNAL ENGINE — Data Generation + Augmentation
+# ============================================================
+# Số synthetic samples sinh ra mỗi loại regime (trend/chop/crash/...)
+SYNTH_N_PER_REGIME       = 150
+# Tỉ lệ synthetic trong tập train khi blend với real data
+# 0.5 = 50% real + 50% synthetic; 1.0 = 100% synthetic (cold start)
+SYNTH_BLEND_RATIO        = 0.50
+# Bật tự động synthetic boost khi real samples < ML_MIN_TRAIN_SAMPLES
+SYNTH_AUTO_BOOST         = True
+# Chạy synthetic training khi khởi động lần đầu (cold start)
+SYNTH_COLD_START         = True

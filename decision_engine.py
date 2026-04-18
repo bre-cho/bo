@@ -129,6 +129,37 @@ class DecisionEngine:
             self.candle_lib= None
             self.model_reg = None
 
+        # ── Cold-start synthetic training ─────────────────────────
+        if config.ML_ENABLED and config.SYNTH_COLD_START:
+            self._cold_start_synthetic_training()
+
+    # ── Cold-start synthetic training ────────────────────────────
+
+    def _cold_start_synthetic_training(self) -> None:
+        """
+        Chạy synthetic training ngay khi khởi động nếu chưa có models.
+        Đảm bảo model sẵn sàng trước lệnh đầu tiên.
+        """
+        import os as _os
+        model_file = _os.path.join(config.ML_MODELS_DIR, "win_classifier.pkl")
+        if _os.path.exists(model_file):
+            return  # Models already trained — skip cold start
+
+        print("\n  🏋️  [ColdStart] No models found — running synthetic pre-training...")
+        try:
+            from synthetic_engine import run_full_synthetic_training
+            metrics = run_full_synthetic_training()
+            if self.model_reg is not None:
+                self.model_reg.register(
+                    "win_classifier",
+                    n_train    = metrics["n_samples"],
+                    train_score= metrics["win_clf_auc"],
+                )
+            print(f"  🏋️  [ColdStart] Done: AUC={metrics['win_clf_auc']:.4f}  "
+                  f"n={metrics['n_samples']}  LSTM={'ok' if metrics['lstm_trained'] else 'skip'}")
+        except Exception as exc:
+            print(f"  🏋️  [ColdStart] Synthetic training failed: {exc}")
+
     # ── Persistence ───────────────────────────────────────────────
 
     def _load_mode(self) -> SystemMode:
@@ -539,20 +570,48 @@ class DecisionEngine:
         if config.ML_ENABLED and self._cycle_count % config.ML_RETRAIN_INTERVAL == 0:
             try:
                 from ml_models import EnsembleScorer
+                from feature_pipeline import build_training_dataset
                 import json as _json
-                raw_history = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
+                raw_history   = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
                 trade_history = [_json.loads(r) for r in raw_history]
                 # Use candle library if available, else fetch fresh
                 if self.candle_lib is not None:
                     df = self.candle_lib.get(config.SYMBOL).get_dataframe()
                 else:
                     df = deriv_data.fetch_candles(count=config.SIM_CANDLE_COUNT)
+
+                # Build real feature dataset
+                real_X, real_y = (None, None)
                 if df is not None and not df.empty:
+                    real_X, real_y = build_training_dataset(df)
+
+                n_real = len(real_X) if real_X is not None else 0
+
+                # ── Synthetic boost: kick in when real data insufficient ──
+                if config.SYNTH_AUTO_BOOST and n_real < config.ML_MIN_TRAIN_SAMPLES:
+                    print(
+                        f"  🏋️  [Synthetic] Real samples={n_real} < {config.ML_MIN_TRAIN_SAMPLES} "
+                        f"— activating synthetic boost..."
+                    )
+                    from synthetic_engine import run_full_synthetic_training
+                    synth_metrics = run_full_synthetic_training(
+                        real_df = df,
+                        real_X  = real_X if n_real > 0 else None,
+                        real_y  = real_y if n_real > 0 else None,
+                    )
+                    if self.model_reg is not None:
+                        self.model_reg.register(
+                            "win_classifier",
+                            n_train    = synth_metrics["n_samples"],
+                            train_score= synth_metrics["win_clf_auc"],
+                        )
+                    print(f"  🏋️  [Synthetic] Done: AUC={synth_metrics['win_clf_auc']:.4f}  "
+                          f"n={synth_metrics['n_samples']}")
+                elif df is not None and not df.empty:
+                    # Enough real data — use normal retrain + synth blend
                     scorer = EnsembleScorer()
                     scorer.retrain_all(df, trade_history)
-                    # Register new versions
                     if self.model_reg is not None:
-                        # Get actual score from the trained classifier if available
                         try:
                             actual_score = getattr(scorer.win_clf._model, 'cv_values_', None)
                             if actual_score is not None:

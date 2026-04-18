@@ -334,6 +334,34 @@ def build_training_dataset(
     return np.array(X_list, dtype=np.float32), np.array(y_list, dtype=np.int32)
 
 
+def augment_training_dataset(
+    X: np.ndarray,
+    y: np.ndarray,
+    target_multiplier: int = 3,
+    seed: Optional[int] = 42,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Augment an existing (X, y) dataset using SignalAugmentor.
+
+    Shortcut wrapper — delegates to SignalAugmentor.augment_all().
+
+    Parameters
+    ----------
+    X                  : Feature matrix [n, N_FEATURES]
+    y                  : Labels [n]
+    target_multiplier  : Target size = len(X) × multiplier
+    seed               : Random seed
+
+    Returns
+    -------
+    (X_augmented, y_augmented)
+    """
+    from synthetic_engine import SignalAugmentor
+    aug          = SignalAugmentor(seed=seed)
+    target_n     = len(X) * target_multiplier
+    return aug.augment_all(X, y, target_n=target_n)
+
+
 if __name__ == "__main__":
     import deriv_data
     df = deriv_data.fetch_candles(count=200)

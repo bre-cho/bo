@@ -88,3 +88,12 @@ body { font-size: 0.875rem; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #0f0f1a; }
 ::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 3px; }
+
+/* Synthetic Engine regime badges */
+.regime-badge {
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  text-align: center;
+  color: #e5e7eb;
+}

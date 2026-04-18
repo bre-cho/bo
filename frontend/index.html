@@ -30,6 +30,7 @@
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-dashboard">📊 Dashboard</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-strategy">💼 Chiến lược vốn</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-control">⚙️ Kiểm soát</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Synthetic Engine</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
@@ -280,6 +281,111 @@
             <button class="btn btn-primary mt-3 w-100" onclick="applyWaveFilter()">
               <i class="bi bi-funnel"></i> Áp dụng bộ lọc
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== SYNTHETIC ENGINE =================== -->
+  <div class="tab-pane fade" id="tab-synthetic">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card card-dark">
+          <div class="card-header">🏋️ Huấn luyện với dữ liệu tổng hợp</div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Sinh nến tổng hợp theo nhiều chế độ thị trường (trending, choppy, crash, spike)
+              để model học nhanh hơn — không cần đợi đủ lệnh thật.
+            </p>
+            <div class="mb-3">
+              <label class="form-label text-muted">Số mẫu mỗi regime</label>
+              <input type="number" class="form-control bg-dark text-light border-secondary"
+                     id="synth-n-per-regime" value="150" min="30" max="500" step="10">
+              <div class="form-text text-muted">
+                7 regime types × n = tổng số mẫu synthetic. Khuyến nghị: 100–200.
+              </div>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="synth-blend-real" checked>
+                <label class="form-check-label text-muted">Blend với dữ liệu nến thật</label>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-success flex-grow-1" onclick="runSyntheticTrain()" id="synth-train-btn">
+                <i class="bi bi-play-circle"></i> Bắt đầu huấn luyện
+              </button>
+              <button class="btn btn-outline-info" onclick="previewSyntheticData()">
+                <i class="bi bi-eye"></i> Xem trước
+              </button>
+            </div>
+            <div id="synth-train-progress" class="mt-3" style="display:none">
+              <div class="progress bg-dark">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                     style="width: 100%" id="synth-progress-bar"></div>
+              </div>
+              <div class="text-muted small mt-1 text-center" id="synth-progress-label">Đang tạo dữ liệu...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Regime descriptions -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">7 loại Regime được sinh</div>
+          <div class="card-body p-2">
+            <div class="row g-2">
+              <div class="col-6"><div class="regime-badge bg-success bg-opacity-10 border border-success">↑ Trend UP</div></div>
+              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">↓ Trend DOWN</div></div>
+              <div class="col-6"><div class="regime-badge bg-secondary bg-opacity-10 border border-secondary">↔ Choppy</div></div>
+              <div class="col-6"><div class="regime-badge bg-warning bg-opacity-10 border border-warning">💥 Crash</div></div>
+              <div class="col-6"><div class="regime-badge bg-info bg-opacity-10 border border-info">🚀 Recovery</div></div>
+              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">🪤 False Breakout</div></div>
+              <div class="col-12"><div class="regime-badge bg-primary bg-opacity-10 border border-primary">🔀 Mixed (Markov chain)</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <!-- Training result -->
+        <div class="card card-dark" id="synth-result-card" style="display:none">
+          <div class="card-header text-muted small">Kết quả huấn luyện</div>
+          <div class="card-body" id="synth-result-body"></div>
+        </div>
+
+        <!-- Dataset preview -->
+        <div class="card card-dark mt-3" id="synth-preview-card" style="display:none">
+          <div class="card-header text-muted small">Xem trước dataset</div>
+          <div class="card-body" id="synth-preview-body"></div>
+        </div>
+
+        <!-- Augmentation info -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Kỹ thuật Augmentation</div>
+          <div class="card-body p-2">
+            <div class="small text-muted">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary">Gaussian Noise</span>
+                <span>Thêm nhiễu nhỏ vào feature vector</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary">Feature Dropout</span>
+                <span>Random zero 15% features</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary">Mixup</span>
+                <span>Blend 2 samples cùng class</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary">Cutout</span>
+                <span>Zero dải features liên tiếp</span>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">Time Warp</span>
+                <span>Biến dạng time axis (LSTM)</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

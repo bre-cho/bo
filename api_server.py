@@ -295,6 +295,59 @@ def create_app():
         reg = ModelRegistry()
         return {"report": reg.report(), "versions": reg._state.versions[-20:]}
 
+    # ── Synthetic Engine ──────────────────────────────────────────
+    class SyntheticTrainRequest(BaseModel):
+        n_per_regime   : int   = config.SYNTH_N_PER_REGIME
+        blend_real_data: bool  = True
+
+    @app.post("/synthetic/train")
+    async def synthetic_train(req: SyntheticTrainRequest):
+        """
+        Trigger synthetic training on demand.
+        Generates synthetic candles → trains WinClassifier + LSTM.
+        """
+        try:
+            from synthetic_engine import run_full_synthetic_training
+            # Optionally load real candle data for blending
+            real_df = None
+            if req.blend_real_data:
+                try:
+                    import deriv_data as _dd
+                    real_df = _dd.fetch_candles(count=config.SIM_CANDLE_COUNT)
+                except Exception:
+                    pass
+            metrics = run_full_synthetic_training(real_df=real_df, n_per_regime=req.n_per_regime)
+            return {
+                "status"    : "ok",
+                "message"   : "Synthetic training complete",
+                "metrics"   : metrics,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/synthetic/demo")
+    async def synthetic_demo(n_per_regime: int = Query(default=30, ge=10, le=500)):
+        """
+        Preview synthetic dataset stats without training.
+        Returns regime counts, win rate, feature vector shape.
+        """
+        try:
+            from synthetic_engine import SyntheticScenarioLibrary
+            lib  = SyntheticScenarioLibrary(seed=42)
+            X, y = lib.build_dataset(n_per_regime=n_per_regime, balance=True)
+            return {
+                "n_samples"    : len(X),
+                "win_rate_pct" : round(float(y.mean()) * 100, 1),
+                "n_features"   : int(X.shape[1]) if len(X) > 0 else 0,
+                "n_wins"       : int(y.sum()),
+                "n_losses"     : int(len(y) - y.sum()),
+                "feature_names": list(
+                    __import__("feature_pipeline").FEATURE_NAMES
+                ),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return app
 
 
