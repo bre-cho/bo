@@ -570,7 +570,6 @@ class MutationFactory:
         Returns proposals with new_value populated.
         Proposals where new_value cannot be computed are removed.
         """
-        from sovereign_oversight import _now_iso as _ni
         result: List[MutationProposal] = []
 
         for p in proposals:
@@ -589,13 +588,11 @@ class MutationFactory:
 
     def _infer_direction(self, p: MutationProposal) -> Optional[int]:
         """Infer direction (+1/-1) from hypothesis metadata."""
-        # Direction stored in description hint: look for hypothesis config
-        from autonomous_evolution import HypothesisGenerator
         for wt, hypotheses in HypothesisGenerator._HYPOTHESES.items():
             for h in hypotheses:
                 if h["param"] == p.target_param and h["type"] == p.mutation_type:
                     return h["direction"]
-        # Fallback: default +1 if expected_delta > 0 else -1
+        # Fallback: default +1
         return +1
 
     def _compute_new_value(self, p: MutationProposal, direction: int) -> Any:
@@ -662,7 +659,6 @@ class MutationFactory:
 
     def _find_magnitude(self, param: str) -> float:
         """Look up magnitude for a param from hypothesis table."""
-        from autonomous_evolution import HypothesisGenerator
         for wt, hypotheses in HypothesisGenerator._HYPOTHESES.items():
             for h in hypotheses:
                 if h["param"] == param:
@@ -779,7 +775,9 @@ class MutationEvaluator:
             gp        = sum(r.total_pnl for r in results if r.total_pnl > 0)
             gl        = abs(sum(r.total_pnl for r in results if r.total_pnl < 0))
             pf        = gp / gl if gl > 0 else (1.0 if gp > 0 else 0.0)
-            # Proxy drawdown from losses
+            # Proxy drawdown from loss rate (approximation: fraction of losing trades).
+            # This is a conservative proxy; actual equity-curve drawdown is unavailable
+            # from FitnessResult aggregates. It ensures dd_delta direction is reliable.
             dd = losses / max(total_t, 1)
             return {
                 "win_rate"     : round(wr, 4),

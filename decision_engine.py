@@ -965,14 +965,20 @@ class DecisionEngine:
         # Empire Control Layer summary
         if self._empire is not None:
             emp_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
-            emp_in = emp_interval - (self._cycle_count % max(emp_interval, 1))
-            print(f"  SSCL🌐   : empire_control  next_in={emp_in} cycles")
+            if emp_interval > 0:
+                emp_in = emp_interval - (self._cycle_count % emp_interval)
+                print(f"  SSCL🌐   : empire_control  next_in={emp_in} cycles")
+            else:
+                print(f"  SSCL🌐   : empire_control  (auto-run disabled)")
         # Autonomous Evolution Engine summary
         if self._aee is not None:
             aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
-            aee_in  = aee_interval - (self._cycle_count % max(aee_interval, 1))
             dry_tag = "dry-run" if getattr(config, "AEE_DRY_RUN", True) else "live"
-            print(f"  AEE🧬    : mode={dry_tag}  next_in={aee_in} cycles")
+            if aee_interval > 0:
+                aee_in = aee_interval - (self._cycle_count % aee_interval)
+                print(f"  AEE🧬    : mode={dry_tag}  next_in={aee_in} cycles")
+            else:
+                print(f"  AEE🧬    : mode={dry_tag}  (auto-run disabled)")
 
     # ── Master run loop ───────────────────────────────────────────
 

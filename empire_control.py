@@ -389,8 +389,12 @@ class MergeAdvisor:
 
                 avg_individual_wr = (a_tel.win_rate + b_tel.win_rate) / 2.0
 
-                # Synergy: improvement potential + volume bonus
-                volume_bonus = math.log(max(combined_trades, 1) / 10.0 + 1) / 5.0
+                # Synergy: improvement potential + volume bonus.
+                # VOLUME_BONUS_BASE=10: minimum trades for meaningful volume bonus.
+                # VOLUME_BONUS_DENOM=5: scales bonus to ~0.0–0.4 range.
+                _VOLUME_BONUS_BASE  = 10.0
+                _VOLUME_BONUS_DENOM = 5.0
+                volume_bonus = math.log(max(combined_trades, 1) / _VOLUME_BONUS_BASE + 1) / _VOLUME_BONUS_DENOM
                 synergy      = (combined_wr - avg_individual_wr + 0.05) * (1.0 + volume_bonus)
                 synergy      = round(max(0.0, synergy), 4)
 
@@ -505,6 +509,17 @@ class EmpireObjectiveEngine:
 # ──────────────────────────────────────────────────────────────────
 # 6. EmpireControlLayer — Orchestrator
 # ──────────────────────────────────────────────────────────────────
+
+class _BudgetProxy:
+    """
+    Lightweight proxy to hold ResourceBudget fields read from Redis JSON.
+    Avoids importing ResourceBudget and allows attribute access like
+    `budget.attention_weight` when rebuilding budgets from the SSOL report.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 class EmpireControlLayer:
     """
@@ -635,7 +650,7 @@ class EmpireControlLayer:
                 return {}
             report_data = json.loads(raw_report)
             return {
-                b["cluster_id"]: type("Budget", (), b)()
+                b["cluster_id"]: _BudgetProxy(**b)
                 for b in report_data.get("resource_budgets", [])
             }
         except Exception:
