@@ -540,6 +540,373 @@ function renderEvolutionHistory(history) {
     </tr>`).join('');
 }
 
+// ── Game Theory Engine ───────────────────────────────────────────
+
+async function runGameTheory() {
+  const regime    = document.getElementById('gt-regime').value;
+  const rounds    = parseInt(document.getElementById('gt-rounds').value) || 100;
+  const opponents = parseInt(document.getElementById('gt-opponents').value) || 4;
+  const btn       = document.getElementById('gt-run-btn');
+  const prog      = document.getElementById('gt-progress');
+
+  btn.disabled       = true;
+  prog.style.display = '';
+
+  const result = await apiPost('/gametheory/simulate', {
+    current_regime : regime || '',
+    n_rounds       : rounds,
+    n_opponents    : opponents,
+    trade_outcomes : [],
+  });
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  if (result && result.status === 'ok') {
+    renderGTRecommendation(result);
+    renderGTNash(result.nash_solutions || []);
+    renderGTMatrix(result);
+    renderGTOpponent(result.opponent_beliefs || {});
+    renderGTEXP3(result.exp3_weights || {});
+    renderGTPressure(result.pressure_analysis || {});
+    renderGTEcosystem(result.ecosystem_state || {});
+    renderGTAgents((result.ecosystem_state || {}).agent_states || []);
+    renderGTInsights(result.insights || []);
+
+    ['gt-rec-card','gt-nash-card','gt-matrix-card','gt-opp-card','gt-exp3-card',
+     'gt-pressure-card','gt-eco-card','gt-agents-card','gt-insights-card']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+
+    showToast(
+      `Game Theory: action=${result.recommended_action} pressure=${(result.platform_pressure*100).toFixed(0)}%`,
+      'warning'
+    );
+  } else {
+    showToast('Game theory analysis thất bại', 'warning');
+  }
+}
+
+async function loadGameTheoryReport() {
+  const result = await apiGet('/gametheory/report');
+  if (!result || result.status === 'no_report' || result.status === 'no_data') return;
+
+  renderGTRecommendation(result);
+  renderGTNash(result.nash_solutions || []);
+  renderGTOpponent(result.opponent_beliefs || {});
+  renderGTEXP3(result.exp3_weights || {});
+  renderGTPressure(result.pressure_analysis || {});
+  renderGTEcosystem(result.ecosystem_state || {});
+  renderGTAgents((result.ecosystem_state || {}).agent_states || []);
+  renderGTInsights(result.insights || []);
+
+  ['gt-rec-card','gt-nash-card','gt-opp-card','gt-exp3-card',
+   'gt-pressure-card','gt-eco-card','gt-agents-card','gt-insights-card']
+  .forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+}
+
+function renderGTRecommendation(result) {
+  const body = document.getElementById('gt-rec-body');
+  if (!body) return;
+
+  const action   = result.recommended_action || '?';
+  const pressure = (result.platform_pressure || 0) * 100;
+  const crowding = (result.crowding_index || 0) * 100;
+  const nashPayoff = result.nash_payoff || 0;
+  const opp      = result.dominant_opponent || '?';
+  const conf     = (result.opponent_concentration || 0) * 100;
+
+  const actionColor = {CALL:'text-success', PUT:'text-danger', SKIP:'text-warning'}[action] || 'text-info';
+  const pressBadge  = pressure > 50 ? 'bg-danger' : pressure > 20 ? 'bg-warning' : 'bg-success';
+  const crowdBadge  = crowding > 50 ? 'bg-danger' : crowding > 30 ? 'bg-warning' : 'bg-success';
+
+  body.innerHTML = `
+    <div class="d-flex justify-content-around mb-2">
+      <div class="text-center">
+        <div class="fs-4 fw-bold ${actionColor}">${action}</div>
+        <div class="text-muted small">Nash action</div>
+      </div>
+      <div class="text-center">
+        <div class="fs-5 fw-bold text-info">${nashPayoff.toFixed(4)}</div>
+        <div class="text-muted small">Nash payoff/trade</div>
+      </div>
+    </div>
+    <div class="d-flex gap-2 justify-content-center flex-wrap small">
+      <span class="badge ${pressBadge} bg-opacity-25 text-light">
+        Platform pressure: ${pressure.toFixed(0)}%
+      </span>
+      <span class="badge ${crowdBadge} bg-opacity-25 text-light">
+        Crowding: ${crowding.toFixed(0)}%
+      </span>
+      <span class="badge bg-info bg-opacity-25 text-info">
+        Opponent: ${opp} (${conf.toFixed(0)}%)
+      </span>
+    </div>`;
+}
+
+function renderGTNash(nashList) {
+  const body = document.getElementById('gt-nash-body');
+  if (!body) return;
+  if (!nashList || !nashList.length) {
+    body.innerHTML = '<div class="text-muted small">No Nash equilibrium found</div>';
+    return;
+  }
+
+  body.innerHTML = nashList.slice(0,2).map((ne, idx) => {
+    const s = ne.our_strategy || [0.33, 0.33, 0.34];
+    const barFor = (label, val, color) =>
+      `<div class="d-flex align-items-center gap-1 mb-1">
+        <span class="small ${color}" style="width:40px">${label}</span>
+        <div class="progress flex-grow-1 bg-dark" style="height:8px">
+          <div class="progress-bar ${color.replace('text-','bg-')}"
+               style="width:${Math.round(val*100)}%"></div>
+        </div>
+        <span class="small ${color}" style="width:35px">${(val*100).toFixed(0)}%</span>
+      </div>`;
+
+    return `<div class="${idx>0?'mt-3 border-top border-secondary pt-2':''}">
+      <div class="small text-muted mb-1">${idx+1}. ${ne.type} | payoff=${ne.payoff}</div>
+      ${barFor('CALL', s[0]||0, 'text-success')}
+      ${barFor('PUT',  s[1]||0, 'text-danger')}
+      ${barFor('SKIP', s[2]||0, 'text-warning')}
+    </div>`;
+  }).join('');
+}
+
+function renderGTMatrix(result) {
+  const card = document.getElementById('gt-matrix-card');
+  const body = document.getElementById('gt-matrix-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  const labels = ['CALL', 'PUT', 'SKIP'];
+  const winProb = (1 - (result.platform_pressure||0)*0.5) * 0.55;
+  const payout  = 0.85;
+  const cd      = 0.10;
+
+  const payoff = (a, o) => {
+    if (a === 2) return 0;
+    const crowded = a === o && o < 2;
+    const eff_b   = payout * (crowded ? (1-cd) : 1.0);
+    const win_p   = a === 0 ? winProb : 1-winProb;
+    return win_p * eff_b - (1-win_p);
+  };
+
+  const cell = (v) => {
+    const cls = v > 0 ? 'text-success' : v < 0 ? 'text-danger' : 'text-muted';
+    return `<td class="text-center ${cls} small" style="width:70px">${v.toFixed(3)}</td>`;
+  };
+
+  body.innerHTML = `
+    <table class="table table-dark table-sm table-bordered text-center mb-0" style="font-size:0.72rem">
+      <thead>
+        <tr>
+          <th class="text-muted">Us \\ Opp</th>
+          ${labels.map(l=>`<th class="text-muted">${l}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${labels.map((la,a) => `<tr>
+          <th class="text-muted">${la}</th>
+          ${labels.map((_,o) => cell(payoff(a,o))).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="text-muted small mt-1">Payoff per unit stake | green=win, red=lose</div>`;
+}
+
+function renderGTOpponent(beliefs) {
+  const body = document.getElementById('gt-opp-body');
+  if (!body) return;
+
+  const typeBeliefs = beliefs.beliefs || {};
+  const conc        = (beliefs.concentration || 0) * 100;
+  const nObs        = beliefs.n_observations || 0;
+  const predicted   = beliefs.predicted_next || {};
+
+  const typeColors = {
+    TREND_FOLLOWER:'text-success', MEAN_REVERTER:'text-danger',
+    MOMENTUM:'text-warning', RANDOM_BOT:'text-secondary'
+  };
+
+  const typeBeliefRows = Object.entries(typeBeliefs).map(([t, p]) =>
+    `<div class="d-flex align-items-center gap-1 mb-1">
+      <span class="small ${typeColors[t]||'text-muted'}" style="min-width:110px">${t}</span>
+      <div class="progress flex-grow-1 bg-dark" style="height:6px">
+        <div class="progress-bar ${(typeColors[t]||'text-secondary').replace('text-','bg-')}"
+             style="width:${Math.round(p*100)}%"></div>
+      </div>
+      <span class="small text-muted">${(p*100).toFixed(0)}%</span>
+    </div>`
+  ).join('');
+
+  body.innerHTML = `
+    <div class="mb-2">${typeBeliefRows}</div>
+    <div class="d-flex justify-content-between small text-muted border-top border-secondary pt-2">
+      <span>Confidence: <strong class="text-info">${conc.toFixed(0)}%</strong></span>
+      <span>Observations: ${nObs}</span>
+    </div>
+    <div class="mt-1 small text-muted">Predicted next:
+      <span class="text-success">CALL=${((predicted.CALL||0)*100).toFixed(0)}%</span>
+      <span class="text-danger ms-2">PUT=${((predicted.PUT||0)*100).toFixed(0)}%</span>
+      <span class="text-warning ms-2">SKIP=${((predicted.SKIP||0)*100).toFixed(0)}%</span>
+    </div>`;
+}
+
+function renderGTEXP3(exp3) {
+  const body = document.getElementById('gt-exp3-body');
+  if (!body) return;
+
+  const ws     = exp3.weights || {};
+  const ms     = exp3.mixed_strategy || {};
+  const greedy = exp3.greedy_action || '?';
+  const rounds = exp3.rounds || 0;
+  const regret = exp3.estimated_regret || 0;
+  const bound  = exp3.regret_bound || 0;
+  const gamma  = exp3.gamma || 0.10;
+  const eta    = exp3.eta   || 0.10;
+
+  const actionColors = {CALL:'text-success', PUT:'text-danger', SKIP:'text-warning'};
+
+  const barFor = (k) => {
+    const w = ws[k] || 0;
+    const p = (ms[k] || 0) * 100;
+    const wMax = Math.max(...Object.values(ws), 1);
+    const pct  = Math.round(w / wMax * 100);
+    return `
+      <div class="d-flex align-items-center gap-1 mb-1">
+        <span class="small ${actionColors[k]||'text-muted'}" style="width:40px">${k}</span>
+        <div class="progress flex-grow-1 bg-dark" style="height:8px">
+          <div class="progress-bar ${(actionColors[k]||'text-secondary').replace('text-','bg-')}"
+               style="width:${pct}%"></div>
+        </div>
+        <span class="small text-muted">${p.toFixed(0)}%</span>
+      </div>`;
+  };
+
+  body.innerHTML = `
+    ${['CALL','PUT','SKIP'].map(barFor).join('')}
+    <div class="d-flex justify-content-between small text-muted border-top border-secondary pt-2 mt-1">
+      <span>Greedy: <strong class="text-info">${greedy}</strong></span>
+      <span>Rounds: ${rounds}</span>
+    </div>
+    <div class="small text-muted mt-1">
+      Regret: ${regret.toFixed(1)} / bound ${bound.toFixed(0)}
+      &nbsp;|&nbsp; γ=${gamma} η=${eta}
+    </div>`;
+}
+
+function renderGTPressure(pa) {
+  const body = document.getElementById('gt-pressure-body');
+  if (!body) return;
+
+  const score  = (pa.pressure_score || 0) * 100;
+  const pressCls = score > 50 ? 'bg-danger' : score > 20 ? 'bg-warning' : 'bg-success';
+  const wr_r   = pa.win_rate_recent;
+  const wr_h   = pa.win_rate_historical;
+  const signals = pa.signals || [];
+
+  body.innerHTML = `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between small mb-1">
+        <span class="text-muted">Pressure score</span>
+        <span class="${score>50?'text-danger':score>20?'text-warning':'text-success'} fw-bold">${score.toFixed(0)}%</span>
+      </div>
+      <div class="progress bg-dark" style="height:10px">
+        <div class="progress-bar ${pressCls}" style="width:${Math.round(score)}%"></div>
+      </div>
+    </div>
+    ${wr_r != null ? `<div class="small text-muted mb-2">
+      WR gần đây: <span class="${wr_r < wr_h ? 'text-danger':'text-success'}">${(wr_r*100).toFixed(1)}%</span>
+      vs lịch sử: ${(wr_h*100).toFixed(1)}%
+    </div>` : ''}
+    ${signals.map(s=>`<div class="small text-muted mb-1">• ${s}</div>`).join('')}`;
+}
+
+function renderGTEcosystem(eco) {
+  const body = document.getElementById('gt-eco-body');
+  if (!body) return;
+
+  const crowding  = (eco.crowding_avg   || 0) * 100;
+  const pressure  = (eco.pressure_final || 0) * 100;
+  const nashDist  = eco.nash_distance  || 0;
+  const ours      = eco.our_state || {};
+
+  const cwHist = eco.crowding_history || [];
+  const prHist = eco.pressure_history || [];
+
+  const sparkline = (data, color) => {
+    if (!data.length) return '';
+    const mx = Math.max(...data, 0.01);
+    return `<div class="d-flex align-items-end gap-px" style="height:28px">
+      ${data.map(v=>`<div style="flex:1;height:${Math.round(v/mx*100)}%;background:${color};opacity:0.7;min-height:1px"></div>`).join('')}
+    </div>`;
+  };
+
+  body.innerHTML = `
+    <div class="row g-2 text-center mb-2">
+      <div class="col-3">
+        <div class="fw-bold text-warning">${crowding.toFixed(0)}%</div>
+        <div class="text-muted" style="font-size:0.7rem">Crowding</div>
+      </div>
+      <div class="col-3">
+        <div class="fw-bold ${pressure>30?'text-danger':'text-success'}">${pressure.toFixed(0)}%</div>
+        <div class="text-muted" style="font-size:0.7rem">Pressure</div>
+      </div>
+      <div class="col-3">
+        <div class="fw-bold text-info">${nashDist.toFixed(3)}</div>
+        <div class="text-muted" style="font-size:0.7rem">Nash dist</div>
+      </div>
+      <div class="col-3">
+        <div class="fw-bold text-light">${((ours.win_rate||0)*100).toFixed(1)}%</div>
+        <div class="text-muted" style="font-size:0.7rem">Our WR</div>
+      </div>
+    </div>
+    <div class="mb-1">
+      <div class="text-muted" style="font-size:0.7rem">Crowding trend</div>
+      ${sparkline(cwHist, '#ffc107')}
+    </div>
+    <div>
+      <div class="text-muted" style="font-size:0.7rem">Platform pressure trend</div>
+      ${sparkline(prHist, '#dc3545')}
+    </div>`;
+}
+
+function renderGTAgents(agents) {
+  const tbody = document.querySelector('#gt-agents-table tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = (agents || []).map(a => {
+    const wr    = ((a.win_rate || 0) * 100).toFixed(1);
+    const pnl   = (a.total_pnl || 0).toFixed(3);
+    const isUs  = a.agent_id === 'us';
+    const pnlCls = a.total_pnl > 0 ? 'text-success' : 'text-danger';
+    return `<tr ${isUs?'class="table-active"':''}>
+      <td class="small ${isUs?'text-info fw-bold':'text-muted'}">${a.agent_id}</td>
+      <td class="small text-muted" style="font-size:0.7rem">${a.agent_type}</td>
+      <td class="small">${wr}%</td>
+      <td class="small ${pnlCls}">${pnl}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderGTInsights(insights) {
+  const card = document.getElementById('gt-insights-card');
+  const body = document.getElementById('gt-insights-body');
+  if (!card || !body) return;
+  card.style.display = '';
+  body.innerHTML = (insights || []).map(i =>
+    `<div class="d-flex gap-2 mb-1 small">
+       <span class="text-warning flex-shrink-0">•</span>
+       <span class="text-muted">${i}</span>
+     </div>`
+  ).join('');
+}
+
 // ── Utility AI Engine ────────────────────────────────────────────
 
 const UTILITY_PRESETS = {
@@ -1345,5 +1712,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load utility report when utility tab is clicked
   document.querySelectorAll('[href="#tab-utility"]').forEach(el => {
     el.addEventListener('click', () => loadUtilityReport());
+  });
+  document.querySelectorAll('[href="#tab-gametheory"]').forEach(el => {
+    el.addEventListener('click', () => loadGameTheoryReport());
   });
 });

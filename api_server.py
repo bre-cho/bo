@@ -25,8 +25,9 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
+import numpy as np
 import redis
 
 import config
@@ -734,6 +735,129 @@ def create_app():
                 "growth_rate"       : gr,
                 "breakeven_winrate" : kelly.breakeven_winrate(),
                 "curve"             : kelly.growth_curve(win_rate),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── Game Theory Engine (Multi-Agent + Market Ecosystem) ────────
+
+    @app.get("/gametheory/report")
+    async def gametheory_report():
+        """
+        Return latest game theory report:
+          Nash equilibrium, opponent model, EXP3 weights,
+          ecosystem state, platform pressure.
+        """
+        try:
+            from gametheory_engine import get_gametheory_report
+            return get_gametheory_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class GameTheorySimRequest(BaseModel):
+        current_regime  : str = ""
+        n_rounds        : int = config.GAME_SIM_ROUNDS
+        n_opponents     : int = config.GAME_N_OPPONENTS
+        trade_outcomes  : List[int] = []   # 1=win, 0=loss
+
+    @app.post("/gametheory/simulate")
+    async def gametheory_simulate(req: GameTheorySimRequest):
+        """
+        Run full game theory analysis + ecosystem simulation.
+        trade_outcomes: optional list of recent outcomes (1=win, 0=loss).
+        """
+        try:
+            from gametheory_engine import GameTheoryEngine
+            engine = GameTheoryEngine()
+            config.GAME_SIM_ROUNDS  = req.n_rounds
+            config.GAME_N_OPPONENTS = req.n_opponents
+            outcomes = req.trade_outcomes or None
+            report   = engine.run(
+                trade_outcomes = outcomes,
+                current_regime = req.current_regime or None,
+                n_rounds       = req.n_rounds,
+                verbose        = False,
+            )
+            return {
+                "status"                 : "ok",
+                "recommended_action"     : report.recommended_action,
+                "nash_payoff"            : report.nash_payoff,
+                "nash_solutions"         : report.nash_solutions[:2],
+                "platform_pressure"      : report.platform_pressure,
+                "crowding_index"         : report.crowding_index,
+                "dominant_opponent"      : report.dominant_opponent,
+                "opponent_concentration" : report.opponent_concentration,
+                "opponent_beliefs"       : report.opponent_beliefs,
+                "exp3_weights"           : report.exp3_weights,
+                "pressure_analysis"      : report.pressure_analysis,
+                "ecosystem_state"        : {
+                    "n_rounds"          : report.ecosystem_state["n_rounds"],
+                    "crowding_avg"      : report.ecosystem_state["crowding_avg"],
+                    "pressure_final"    : report.ecosystem_state["pressure_final"],
+                    "nash_distance"     : report.ecosystem_state["nash_distance"],
+                    "our_state"         : report.ecosystem_state["our_state"],
+                    "agent_states"      : report.ecosystem_state["agent_states"][:6],
+                    "crowding_history"  : report.ecosystem_state["crowding_history"],
+                    "pressure_history"  : report.ecosystem_state["pressure_history"],
+                    "ecosystem_insights": report.ecosystem_state["ecosystem_insights"],
+                },
+                "insights"               : report.insights,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/gametheory/nash")
+    async def gametheory_nash(
+        win_prob : float = config.GAME_BASE_WIN_PROB,
+        crowding : float = 0.0,
+        pressure : float = 0.0,
+    ):
+        """
+        Compute Nash equilibrium for given market conditions.
+        win_prob: base win probability [0.4, 0.7].
+        crowding: crowding discount factor [0, 1].
+        pressure: platform pressure [0, 1].
+        """
+        try:
+            from gametheory_engine import PayoffMatrix, NashSolver, ActionType as AT
+            matrix = PayoffMatrix(
+                base_win_prob     = float(np.clip(win_prob, 0.40, 0.75)),
+                payout            = config.SIM_PAYOUT_RATIO,
+                crowding_discount = float(np.clip(crowding, 0, 0.5)),
+                platform_pressure = float(np.clip(pressure, 0, 0.8)),
+            )
+            solver    = NashSolver()
+            nash_list = solver.solve(matrix)
+            M         = matrix.matrix
+            pne       = matrix.pure_nash_equilibria()
+            return {
+                "status"            : "ok",
+                "win_prob"          : win_prob,
+                "payoff_matrix"     : M.tolist(),
+                "pure_nash"         : [(AT(r).name, AT(c).name) for r, c in pne],
+                "mixed_nash"        : nash_list,
+                "recommended_action": solver.recommended_action(nash_list),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/gametheory/opponents")
+    async def gametheory_opponents():
+        """
+        Return opponent model beliefs from latest report.
+        """
+        try:
+            from gametheory_engine import get_gametheory_report
+            report = get_gametheory_report()
+            if "status" in report:
+                return {"status": "no_data"}
+            return {
+                "status"            : "ok",
+                "opponent_beliefs"  : report.get("opponent_beliefs", {}),
+                "dominant_opponent" : report.get("dominant_opponent", "?"),
+                "exp3_weights"      : report.get("exp3_weights", {}),
+                "platform_pressure" : report.get("platform_pressure", 0),
+                "crowding_index"    : report.get("crowding_index", 0),
             }
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))

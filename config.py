@@ -382,3 +382,23 @@ UTILITY_DISCOUNT_RATE    = 0.20
 UTILITY_DEFAULT_PRESET   = "balanced"
 # Minimum pool size before utility optimization runs
 UTILITY_MIN_POOL_SIZE    = 8
+
+# ============================================================
+# GAME THEORY ENGINE — Multi-Agent + Market Ecosystem
+# ============================================================
+# Base win probability (before crowding / platform pressure adjustments)
+GAME_BASE_WIN_PROB        = 0.55
+# Crowding discount: payout reduction when many bots bet same direction
+GAME_CROWDING_DISCOUNT    = 0.10
+# EXP3 exploration rate γ (fraction of time uniform exploration)
+GAME_EXP3_GAMMA           = 0.10
+# EXP3 learning rate η
+GAME_EXP3_ETA             = 0.10
+# Number of rounds in ecosystem simulation
+GAME_SIM_ROUNDS           = 100
+# Number of opponent bots in simulation
+GAME_N_OPPONENTS          = 4
+# Fictitious play iterations for Nash approximation
+GAME_FP_ITERATIONS        = 500
+# Minimum trade samples for platform pressure detection
+GAME_PRESSURE_MIN_SAMPLES = 20

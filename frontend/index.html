@@ -35,6 +35,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-meta">🔬 Meta-Genetics</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-causal">⚗️ Causal AI</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-utility">🎯 Utility AI</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-gametheory">🕹️ Game Theory</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
@@ -1034,6 +1035,149 @@
         <div class="card card-dark mt-3" id="utility-causal-card" style="display:none">
           <div class="card-header text-muted small">🔗 Causal Alignment</div>
           <div class="card-body p-2 small" id="utility-causal-body"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =================== GAME THEORY =================== -->
+  <div class="tab-pane fade" id="tab-gametheory">
+    <div class="row g-3">
+
+      <!-- Left: controls + payoff matrix + Nash -->
+      <div class="col-md-3">
+        <div class="card card-dark">
+          <div class="card-header">🕹️ Game Theory Engine</div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Tối ưu <em>trong môi trường có đối thủ</em> — Nash Equilibrium,
+              Bayesian opponent modeling, và EXP3 adversarial bandit.
+            </p>
+
+            <!-- Regime -->
+            <div class="mb-3">
+              <label class="text-muted small">Market Regime</label>
+              <select id="gt-regime" class="form-select form-select-sm bg-dark text-light border-secondary mt-1">
+                <option value="">🔍 Auto</option>
+                <option value="trend_up">📈 Trend Up</option>
+                <option value="trend_down">📉 Trend Down</option>
+                <option value="choppy">↔ Choppy</option>
+                <option value="high_vol_choppy">🌊 HV Choppy</option>
+                <option value="crash">💥 Crash</option>
+                <option value="spike">🚀 Spike</option>
+                <option value="recovery">🔄 Recovery</option>
+              </select>
+            </div>
+
+            <!-- Sim params -->
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="text-muted small">Rounds</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="gt-rounds" value="100" min="20" max="500">
+              </div>
+              <div class="col-6">
+                <label class="text-muted small">Opponents</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="gt-opponents" value="4" min="1" max="10">
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button class="btn btn-warning flex-grow-1" onclick="runGameTheory()" id="gt-run-btn">
+                <i class="bi bi-joystick"></i> Phân tích
+              </button>
+              <button class="btn btn-outline-secondary" onclick="loadGameTheoryReport()">
+                <i class="bi bi-arrow-repeat"></i>
+              </button>
+            </div>
+            <div id="gt-progress" class="mt-2" style="display:none">
+              <div class="progress bg-dark">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                     style="width:100%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nash Equilibrium -->
+        <div class="card card-dark mt-3" id="gt-nash-card" style="display:none">
+          <div class="card-header text-muted small">⚖️ Nash Equilibrium</div>
+          <div class="card-body p-2" id="gt-nash-body"></div>
+        </div>
+
+        <!-- Payoff matrix -->
+        <div class="card card-dark mt-3" id="gt-matrix-card" style="display:none">
+          <div class="card-header text-muted small">📊 Payoff Matrix (us vs opponent)</div>
+          <div class="card-body p-2" id="gt-matrix-body"></div>
+        </div>
+
+        <!-- Methodology -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Lý thuyết</div>
+          <div class="card-body p-2 small text-muted">
+            <div class="mb-1"><span class="text-warning">Nash EQ</span> — không ai muốn unilaterally deviate</div>
+            <div class="mb-1"><span class="text-success">Bayesian</span> — P(type|obs) ∝ P(obs|type)·P(type)</div>
+            <div class="mb-1"><span class="text-info">EXP3</span> — regret ≤ O(√KT·lnK) vs adversary</div>
+            <div class="mb-1"><span class="text-warning">Crowding</span> — cùng side → payout giảm</div>
+            <div><span class="text-danger">Pressure</span> — platform adapts chống lại win streaks</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle: Opponent model + EXP3 + platform pressure -->
+      <div class="col-md-5">
+
+        <!-- Recommendation card -->
+        <div class="card card-dark" id="gt-rec-card" style="display:none">
+          <div class="card-header text-muted small">🎯 Strategic Recommendation</div>
+          <div class="card-body" id="gt-rec-body"></div>
+        </div>
+
+        <!-- Opponent model -->
+        <div class="card card-dark mt-3" id="gt-opp-card" style="display:none">
+          <div class="card-header text-muted small">🔍 Bayesian Opponent Model</div>
+          <div class="card-body p-2" id="gt-opp-body"></div>
+        </div>
+
+        <!-- EXP3 weights -->
+        <div class="card card-dark mt-3" id="gt-exp3-card" style="display:none">
+          <div class="card-header text-muted small">🎲 EXP3 Adversarial Bandit</div>
+          <div class="card-body p-2" id="gt-exp3-body"></div>
+        </div>
+
+        <!-- Platform pressure -->
+        <div class="card card-dark mt-3" id="gt-pressure-card" style="display:none">
+          <div class="card-header text-muted small">🔴 Platform Pressure Detector</div>
+          <div class="card-body p-2" id="gt-pressure-body"></div>
+        </div>
+      </div>
+
+      <!-- Right: Ecosystem simulation + agent states + insights -->
+      <div class="col-md-4">
+
+        <!-- Ecosystem simulation chart area -->
+        <div class="card card-dark" id="gt-eco-card" style="display:none">
+          <div class="card-header text-muted small">🌐 Ecosystem Simulation</div>
+          <div class="card-body p-2" id="gt-eco-body"></div>
+        </div>
+
+        <!-- Agent states table -->
+        <div class="card card-dark mt-3" id="gt-agents-card" style="display:none">
+          <div class="card-header text-muted small">👥 Agent Leaderboard</div>
+          <div class="card-body p-0">
+            <table class="table table-dark table-sm mb-0" id="gt-agents-table">
+              <thead><tr><th>Agent</th><th>Type</th><th>WR</th><th>PnL</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="card card-dark mt-3" id="gt-insights-card" style="display:none">
+          <div class="card-header text-muted small">💡 Strategic Insights</div>
+          <div class="card-body p-2" id="gt-insights-body"></div>
         </div>
       </div>
 
