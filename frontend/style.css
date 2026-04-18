@@ -108,3 +108,9 @@ body { font-size: 0.875rem; }
 }
 .gene-label { color: #6b7280; margin-bottom: 2px; }
 .gene-value { color: #e5e7eb; font-weight: 600; font-size: 0.90rem; }
+
+/* Meta-Genetics archetype cards */
+.archetype-card {
+  background: #12121f;
+  font-size: 0.82rem;
+}

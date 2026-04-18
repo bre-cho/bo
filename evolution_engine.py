@@ -889,6 +889,7 @@ class EvolutionEngine:
         self.arena   = SelfPlayArena(n_envs=self.n_envs, candles_per_env=self.env_candles, seed=seed)
         self.ops     = GeneticOperators(seed=seed)
         self.history = EvolutionHistory()
+        self._meta_seeds: List[StrategyGenome] = []   # set by previous run via MetaLearner
 
     # ── Population initialization ─────────────────────────────────
 
@@ -897,6 +898,7 @@ class EvolutionEngine:
         Initialize population with:
           - 1 config-seeded genome (baseline)
           - 1 genome from current champion (if exists in Redis)
+          - meta-seeds from MetaLearner (if available from previous run)
           - rest: random
         """
         pop: List[StrategyGenome] = []
@@ -911,6 +913,15 @@ class EvolutionEngine:
             champ.generation = 0
             champ.evaluated  = False
             pop.append(champ)
+
+        # Meta-seeds from MetaLearner (if available)
+        if self._meta_seeds:
+            for ms in self._meta_seeds:
+                ms.generation = 0
+                ms.evaluated  = False
+                pop.append(ms)
+                if len(pop) >= self.pop_size:
+                    break
 
         # Fill with random genomes
         while len(pop) < self.pop_size:
@@ -971,6 +982,18 @@ class EvolutionEngine:
 
         # Promote champion
         promote_champion(champion, self.history)
+
+        # ── Meta-learning: feed winners into gene pool ────────────
+        try:
+            from strategy_genetics import feed_evolution_results
+            meta_seeds = feed_evolution_results(
+                population   = pop,
+                n_meta_seeds = getattr(config, "META_N_SEEDS", 15),
+            )
+            self._meta_seeds = meta_seeds
+        except Exception as _exc:
+            self._meta_seeds = []
+            print(f"  [Meta] Warning: meta-learning skipped: {_exc}")
 
         return champion
 

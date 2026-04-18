@@ -540,6 +540,174 @@ function renderEvolutionHistory(history) {
     </tr>`).join('');
 }
 
+// ── Meta-Genetics Engine ─────────────────────────────────────────
+
+async function runMetaBreed() {
+  const nSeeds = parseInt(document.getElementById('meta-n-seeds').value) || 12;
+  const btn    = document.getElementById('meta-breed-btn');
+  const prog   = document.getElementById('meta-progress');
+
+  btn.disabled       = true;
+  prog.style.display = '';
+
+  const result = await apiPost('/meta/breed', { n_seeds: nSeeds });
+
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  if (result && result.status === 'ok') {
+    renderMetaInsights(result.insights);
+    renderMetaSeeds(result.seeds);
+    renderMetaPoolStats({ pool_size: result.pool_size, n_archetypes: result.n_archetypes });
+    showToast(`Meta breed: ${result.n_seeds} seeds từ pool ${result.pool_size} genomes`, 'info');
+    await loadMetaReport();
+  } else {
+    showToast('Meta-Learning chưa đủ dữ liệu — chạy evolution trước', 'warning');
+  }
+}
+
+async function loadMetaReport() {
+  const result = await apiGet('/meta/report');
+  if (!result || result.status === 'no_report') return;
+
+  renderMetaInsights(result.insights || []);
+  renderMetaImportance(result.gene_importances || {}, result.top_genes || []);
+  renderMetaPatterns(result.winner_patterns || {});
+  renderMetaPoolStats({ pool_size: result.pool_size, n_archetypes: result.n_archetypes });
+
+  // Load archetypes
+  const archResult = await apiGet('/meta/archetypes');
+  if (archResult && archResult.archetypes) {
+    renderMetaArchetypes(archResult.archetypes);
+  }
+}
+
+function renderMetaInsights(insights) {
+  const card = document.getElementById('meta-insights-card');
+  const body = document.getElementById('meta-insights-body');
+  if (!card || !body || !insights.length) return;
+  card.style.display = '';
+  body.innerHTML = insights.map(i =>
+    `<div class="d-flex gap-2 mb-1 small">
+       <span class="text-info flex-shrink-0">•</span>
+       <span class="text-muted">${i}</span>
+     </div>`
+  ).join('');
+}
+
+function renderMetaImportance(importances, topGenes) {
+  const card = document.getElementById('meta-importance-card');
+  const body = document.getElementById('meta-importance-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  const entries = Object.entries(importances)
+    .sort((a, b) => b[1] - a[1]);
+  const maxImp = entries.length ? entries[0][1] : 1;
+
+  body.innerHTML = entries.map(([gene, imp]) => {
+    const pct   = maxImp > 0 ? Math.round((imp / maxImp) * 100) : 0;
+    const isTop = topGenes.includes(gene);
+    const barColor = isTop ? 'bg-warning' : 'bg-secondary';
+    return `
+      <div class="mb-1">
+        <div class="d-flex justify-content-between small">
+          <span class="${isTop ? 'text-warning fw-bold' : 'text-muted'}">${gene}</span>
+          <span class="text-muted">${imp.toFixed(4)}</span>
+        </div>
+        <div class="progress bg-dark" style="height:5px">
+          <div class="progress-bar ${barColor}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderMetaPatterns(patterns) {
+  const card  = document.getElementById('meta-patterns-card');
+  const tbody = document.querySelector('#meta-patterns-table tbody');
+  if (!card || !tbody) return;
+  card.style.display = '';
+
+  const rows = Object.entries(patterns).map(([gene, p]) => {
+    const tightBadge = p.tight_range
+      ? '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.65rem">tight</span>'
+      : '<span class="badge bg-dark text-muted" style="font-size:0.65rem">loose</span>';
+    const uniMark = p.is_universal ? ' ★' : '';
+    return `
+      <tr>
+        <td class="small ${p.tight_range ? 'text-warning' : 'text-muted'}">${gene}${uniMark}</td>
+        <td class="small text-muted">${(p.low_pct||0).toFixed(2)}</td>
+        <td class="small text-light">${(p.median||0).toFixed(2)}</td>
+        <td class="small text-muted">${(p.high_pct||0).toFixed(2)}</td>
+        <td>${tightBadge}</td>
+      </tr>`;
+  });
+  tbody.innerHTML = rows.join('');
+}
+
+function renderMetaArchetypes(archetypes) {
+  const card = document.getElementById('meta-archetypes-card');
+  const body = document.getElementById('meta-archetypes-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  const colors = ['bg-success', 'bg-info', 'bg-primary', 'bg-warning', 'bg-danger'];
+  body.innerHTML = archetypes.map((arch, i) => {
+    const color = colors[i % colors.length];
+    return `
+      <div class="archetype-card mb-2 border border-secondary rounded p-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="badge ${color} bg-opacity-25 text-light">${arch.label || arch.archetype_id}</span>
+          <span class="text-muted small">${arch.n_members} members</span>
+        </div>
+        <div class="d-flex gap-2 small text-muted">
+          <span>fit <strong class="text-light">${(arch.mean_fitness||0).toFixed(4)}</strong></span>
+          <span>WR <strong class="text-light">${(arch.mean_win_rate||0).toFixed(1)}%</strong></span>
+          <span>PF <strong class="text-light">${(arch.mean_pf||0).toFixed(2)}</strong></span>
+        </div>
+        <div class="small text-muted mt-1">
+          wave_w=${((arch.centroid||{}).wave_weight||0).toFixed(2)}
+          min_score=${((arch.centroid||{}).min_signal_score||0).toFixed(1)}
+          lookahead=${Math.round((arch.centroid||{}).lookahead_candles||5)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderMetaSeeds(seeds) {
+  const card  = document.getElementById('meta-seeds-card');
+  const tbody = document.querySelector('#meta-seeds-table tbody');
+  const badge = document.getElementById('meta-seeds-count');
+  if (!card || !tbody) return;
+  card.style.display = '';
+  if (badge) badge.textContent = seeds.length;
+  tbody.innerHTML = seeds.map((s, i) => `
+    <tr>
+      <td class="text-muted small">${i + 1}</td>
+      <td class="small text-warning">${(s.min_signal_score||60).toFixed(1)}</td>
+      <td class="small text-primary">${(s.wave_weight||1).toFixed(2)}</td>
+      <td class="small text-info">${s.lookahead_candles||5}</td>
+    </tr>`).join('');
+}
+
+function renderMetaPoolStats(stats) {
+  const card = document.getElementById('meta-pool-card');
+  const body = document.getElementById('meta-pool-body');
+  if (!card || !body) return;
+  card.style.display = '';
+  body.innerHTML = `
+    <div class="d-flex gap-3 small">
+      <div class="text-center">
+        <div class="fs-5 text-info fw-bold">${stats.pool_size || 0}</div>
+        <div class="text-muted">Genomes</div>
+      </div>
+      <div class="text-center">
+        <div class="fs-5 text-primary fw-bold">${stats.n_archetypes || 0}</div>
+        <div class="text-muted">Archetypes</div>
+      </div>
+    </div>`;
+}
+
 // ── Utilities ─────────────────────────────────────────────────────
 function setText(id, v) {
   const el = document.getElementById(id);
@@ -580,5 +748,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load evolution status when evolution tab is clicked
   document.querySelectorAll('[href="#tab-evolution"]').forEach(el => {
     el.addEventListener('click', () => loadEvolutionStatus());
+  });
+
+  // Load meta report when meta tab is clicked
+  document.querySelectorAll('[href="#tab-meta"]').forEach(el => {
+    el.addEventListener('click', () => loadMetaReport());
   });
 });

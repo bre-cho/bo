@@ -444,6 +444,88 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
+    # ── Meta-Learning (Strategy Genome Engine) ────────────────────
+
+    @app.get("/meta/report")
+    async def meta_report():
+        """
+        Return latest meta-learning report:
+          gene importances, winner patterns, archetypes, insights.
+        """
+        try:
+            from strategy_genetics import get_meta_report
+            return get_meta_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class MetaBreedRequest(BaseModel):
+        n_seeds: int = config.META_N_SEEDS
+
+    @app.post("/meta/breed")
+    async def meta_breed(req: MetaBreedRequest):
+        """
+        Run one meta-learning cycle and return bred seed genomes.
+        Reads gene pool from Redis/file, analyzes, breeds, saves report.
+        """
+        try:
+            from strategy_genetics import run_meta_cycle
+            seeds, report = run_meta_cycle(n_seeds=req.n_seeds)
+            return {
+                "status"       : "ok",
+                "n_seeds"      : len(seeds),
+                "pool_size"    : report.pool_size,
+                "n_archetypes" : report.n_archetypes,
+                "top_genes"    : report.top_genes,
+                "insights"     : report.insights,
+                "seeds"        : [
+                    {
+                        "genome_id"        : s.genome_id,
+                        "min_signal_score" : round(s.min_signal_score, 2),
+                        "wave_weight"      : round(s.wave_weight, 3),
+                        "lookahead_candles": s.lookahead_candles,
+                        "genes"            : {k: round(v, 4) for k, v in s.genes().items()},
+                    }
+                    for s in seeds
+                ],
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/meta/archetypes")
+    async def meta_archetypes():
+        """Return current strategy archetypes from meta report."""
+        try:
+            from strategy_genetics import get_meta_report
+            report = get_meta_report()
+            if "status" in report:
+                return {"status": "no_data", "archetypes": []}
+            return {
+                "status"    : "ok",
+                "archetypes": report.get("archetypes", []),
+                "n_winners" : report.get("n_winners_used", 0),
+                "pool_size" : report.get("pool_size", 0),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/meta/gene_importance")
+    async def meta_gene_importance():
+        """Return gene importance scores from latest meta report."""
+        try:
+            from strategy_genetics import get_meta_report
+            report = get_meta_report()
+            if "status" in report:
+                return {"status": "no_data", "importances": {}}
+            return {
+                "status"          : "ok",
+                "gene_importances": report.get("gene_importances", {}),
+                "top_genes"       : report.get("top_genes", []),
+                "winner_patterns" : report.get("winner_patterns", {}),
+                "insights"        : report.get("insights", []),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return app
 
 

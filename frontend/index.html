@@ -32,6 +32,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-control">⚙️ Kiểm soát</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Synthetic Engine</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evolution">🧬 Evolution</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-meta">🔬 Meta-Genetics</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
@@ -546,6 +547,138 @@
               <span class="badge bg-primary bg-opacity-25 border border-primary text-primary">🔀 Mixed Markov</span>
             </div>
           </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =================== META-GENETICS =================== -->
+  <div class="tab-pane fade" id="tab-meta">
+    <div class="row g-3">
+
+      <!-- Left: controls + insights -->
+      <div class="col-md-4">
+        <div class="card card-dark">
+          <div class="card-header">🔬 Meta-Learning Analysis</div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Học từ lịch sử winner: gene nào quan trọng, pattern nào lặp lại,
+              cách breed thế hệ tiếp theo thông minh hơn.
+            </p>
+            <div class="mb-3">
+              <label class="form-label text-muted small">Số seeds cần breed</label>
+              <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                     id="meta-n-seeds" value="12" min="4" max="50">
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-info flex-grow-1" onclick="runMetaBreed()" id="meta-breed-btn">
+                <i class="bi bi-bezier2"></i> Phân tích + Breed
+              </button>
+              <button class="btn btn-outline-secondary" onclick="loadMetaReport()">
+                <i class="bi bi-arrow-repeat"></i>
+              </button>
+            </div>
+            <div id="meta-progress" class="mt-2" style="display:none">
+              <div class="progress bg-dark">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                     style="width: 100%"></div>
+              </div>
+              <div class="text-muted small mt-1 text-center">Phân tích gene pool…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="card card-dark mt-3" id="meta-insights-card" style="display:none">
+          <div class="card-header text-muted small">💡 Insights từ Meta-Learning</div>
+          <div class="card-body p-2" id="meta-insights-body"></div>
+        </div>
+
+        <!-- Methodology -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Phương pháp phân tích</div>
+          <div class="card-body p-2 small text-muted">
+            <div class="mb-1">
+              <strong class="text-light">Spearman ρ</strong> — tương quan rank gene↔fitness
+            </div>
+            <div class="mb-1">
+              <strong class="text-light">Mutual Info</strong> — phát hiện tương quan phi tuyến
+            </div>
+            <div class="mb-1">
+              <strong class="text-light">K-Means</strong> — cluster winners thành archetypes
+            </div>
+            <div class="mb-1">
+              <strong class="text-light">Guided Crossover</strong> — gene quan trọng → ưu tiên từ winner
+            </div>
+            <div>
+              <strong class="text-light">Attraction Force</strong> — kéo offspring về winner range
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle: gene importance + winner patterns -->
+      <div class="col-md-4">
+        <div class="card card-dark" id="meta-importance-card" style="display:none">
+          <div class="card-header text-muted small">📊 Gene Importance Ranking</div>
+          <div class="card-body p-2" id="meta-importance-body"></div>
+        </div>
+
+        <div class="card card-dark mt-3" id="meta-patterns-card" style="display:none">
+          <div class="card-header text-muted small">🎯 Winner Gene Patterns (p10–p50–p90)</div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:280px;overflow-y:auto">
+              <table class="table table-dark table-sm mb-0" id="meta-patterns-table">
+                <thead class="sticky-top bg-dark">
+                  <tr>
+                    <th>Gene</th>
+                    <th>p10</th>
+                    <th>Median</th>
+                    <th>p90</th>
+                    <th>Tight</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: archetypes + bred seeds -->
+      <div class="col-md-4">
+        <div class="card card-dark" id="meta-archetypes-card" style="display:none">
+          <div class="card-header text-muted small">🧩 Strategy Archetypes</div>
+          <div class="card-body p-2" id="meta-archetypes-body"></div>
+        </div>
+
+        <div class="card card-dark mt-3" id="meta-seeds-card" style="display:none">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="small text-muted">🌱 Meta Seeds được Breed</span>
+            <span class="badge bg-info" id="meta-seeds-count">0</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:220px;overflow-y:auto">
+              <table class="table table-dark table-sm mb-0" id="meta-seeds-table">
+                <thead class="sticky-top bg-dark">
+                  <tr>
+                    <th>#</th>
+                    <th>min_score</th>
+                    <th>wave_w</th>
+                    <th>lookahead</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pool stats -->
+        <div class="card card-dark mt-3" id="meta-pool-card" style="display:none">
+          <div class="card-header text-muted small">🗄️ Gene Pool Stats</div>
+          <div class="card-body" id="meta-pool-body"></div>
         </div>
       </div>
 

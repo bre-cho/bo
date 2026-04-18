@@ -333,3 +333,15 @@ EVOL_TOURNAMENT_K        = 4
 EVOL_AUTO_INTERVAL       = 100  # chu kỳ (0 = tắt)
 # Tự áp dụng champion genome lên config khi evolution xong
 EVOL_AUTO_PROMOTE        = True
+
+# ============================================================
+# META-LEARNING — Strategy Genome Engine
+# ============================================================
+# Kích thước tối đa gene pool (số genome tích lũy qua các runs)
+META_POOL_MAX_SIZE       = 500
+# Số winners dùng để phân tích pattern + archetype clustering
+META_TOP_K_WINNERS       = 30
+# Số archetype cluster (chiến lược nền khác nhau)
+META_N_ARCHETYPES        = 4
+# Số seeds meta-guided sinh ra cho evolution tiếp theo
+META_N_SEEDS             = 12
