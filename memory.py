@@ -220,8 +220,7 @@ class MemoryBrain:
             self._update_pattern(fp, won, pnl)
 
         self._record_count += 1
-        rebuild_interval = getattr(config, "MEMORY_REBUILD_INTERVAL", 20)
-        if self._record_count % rebuild_interval == 0:
+        if self._record_count % config.MEMORY_REBUILD_INTERVAL == 0:
             # Full-rebuild định kỳ để đảm bảo nhất quán
             self.rebuild_rules()
         else:

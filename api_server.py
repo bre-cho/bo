@@ -186,7 +186,9 @@ def create_app():
         # Đọc đúng window cần thiết thay vì toàn bộ danh sách
         total = r.llen(config.REDIS_LOG_KEY)
         start = (page - 1) * size
-        end   = start + size - 1          # lrange end là inclusive
+        if start >= total:
+            return {"total": total, "page": page, "size": size, "records": []}
+        end      = start + size - 1      # lrange end là inclusive
         raw_list = r.lrange(config.REDIS_LOG_KEY, start, end)
         records  = [json.loads(x) for x in raw_list]
         return {

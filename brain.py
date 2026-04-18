@@ -249,7 +249,7 @@ def scan_all_markets(symbols: list[str] = config.SCAN_SYMBOLS) -> list[MarketSig
     for sym in symbols:
         df = candle_map.get(sym)
         if df is None or df.empty:
-            print(f"  [{sym}] ⚠️  Không lấy được dữ liệu")
+            print(f"  [{sym}] ⚠️  Không có dữ liệu nến (fetch thất bại hoặc trống)")
             continue
         try:
             sig = _score_signal(df)
