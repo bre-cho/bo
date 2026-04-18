@@ -146,8 +146,8 @@ class RiskManager:
             )
             if not allowed:
                 return False, reason
-        except Exception:
-            pass  # ControlSystem optional — degrade gracefully
+        except Exception as exc:
+            print(f"[RiskManager] ControlSystem check failed: {exc}")
 
         return True, "OK"
 

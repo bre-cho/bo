@@ -249,14 +249,18 @@ class QLearningAgent:
                 "wave_active" : 1.0 if record.get("wave_active") else 0.0,
                 "fib_zone_val": 0.5 if record.get("fib_zone") else 0.0,
             }
-            won    = bool(record.get("won", False))
             stake  = float(record.get("stake", 1.0))
             pnl    = float(record.get("pnl", 0.0))
             reward = pnl / stake if stake > 0 else 0.0
-            next_f = {
-                "rsi_norm"    : float(trade_history[i+1].get("rsi", 50)) / 100
-                if i + 1 < len(trade_history) else feat_dict["rsi_norm"]
-            }
+            # Use same state as next state at end of history (no future info)
+            if i + 1 < len(trade_history):
+                next_f = {
+                    "rsi_norm"    : float(trade_history[i+1].get("rsi", 50)) / 100,
+                    "wave_active" : 1.0 if trade_history[i+1].get("wave_active") else 0.0,
+                    "fib_zone_val": 0.5 if trade_history[i+1].get("fib_zone") else 0.0,
+                }
+            else:
+                next_f = feat_dict
             self.update(feat_dict, action=1, reward=reward, next_feat_dict=next_f)
         self.save()
         print(f"[QAgent] Trained on {len(trade_history)} trades. States={len(self._q)}")
@@ -271,7 +275,8 @@ class QLearningAgent:
         try:
             with open(self.FILE_PATH) as f:
                 data = json.load(f)
-            self._q = defaultdict(lambda: [0.0, 0.0], {k: v for k, v in data.items()})
+            valid = {k: v for k, v in data.items() if isinstance(v, list) and len(v) == 2}
+            self._q = defaultdict(lambda: [0.0, 0.0], valid)
             print(f"[QAgent] Loaded Q-table: {len(self._q)} states")
             return True
         except Exception as exc:

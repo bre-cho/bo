@@ -136,7 +136,7 @@ async def _fetch_10k_async(symbol: str, count: int = None) -> pd.DataFrame:
             break  # No more data available
         # Next chunk ends just before the oldest candle in this chunk
         oldest_dt = chunk["datetime"].min()
-        end_epoch = int(oldest_dt.timestamp()) - 1
+        end_epoch = int(oldest_dt.timestamp()) - config.GRANULARITY
         await asyncio.sleep(0.3)  # Avoid rate limiting
 
     if not chunks:

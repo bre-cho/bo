@@ -552,7 +552,17 @@ class DecisionEngine:
                     scorer.retrain_all(df, trade_history)
                     # Register new versions
                     if self.model_reg is not None:
-                        self.model_reg.register("win_classifier", n_train=len(trade_history), train_score=0.0)
+                        # Get actual score from the trained classifier if available
+                        try:
+                            actual_score = getattr(scorer.win_clf._model, 'cv_values_', None)
+                            if actual_score is not None:
+                                import numpy as _np
+                                train_score = float(_np.mean(actual_score))
+                            else:
+                                train_score = 0.0
+                        except Exception:
+                            train_score = 0.0
+                        self.model_reg.register("win_classifier", n_train=len(trade_history), train_score=train_score)
                     print(f"  🤖 [ML] Retrain complete ({len(trade_history)} trade samples)")
             except Exception as exc:
                 print(f"  🤖 [ML] Retrain failed: {exc}")

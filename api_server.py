@@ -236,7 +236,7 @@ def create_app():
     async def set_strategy(req: StrategyRequest):
         allowed = {"fixed_fractional","martingale","anti_martingale","victor2","victor3","victor4"}
         if req.name not in allowed:
-            raise HTTPException(status_code=400, detail=f"Strategy must be one of {allowed}")
+            raise HTTPException(status_code=400, detail=f"Strategy must be one of {sorted(allowed)}")
         capst = get_cap_strat()
         capst.set_strategy(req.name, req.base_stake)
         return {"status": "ok", "strategy": req.name, "base_stake": req.base_stake}

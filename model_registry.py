@@ -141,9 +141,11 @@ class ModelRegistry:
         for v in self._state.versions:
             if v["version_id"] == version_id:
                 v["n_live_trades"] += 1
-                total = v["n_live_trades"]
-                wins  = int(v["live_win_rate"] * (total - 1)) + (1 if won else 0)
-                v["live_win_rate"] = wins / total
+                # Track wins separately to avoid floating-point accumulation errors
+                v.setdefault("live_wins", 0)
+                if won:
+                    v["live_wins"] += 1
+                v["live_win_rate"] = v["live_wins"] / v["n_live_trades"]
                 break
         self._save()
 
