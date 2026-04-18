@@ -23,6 +23,7 @@ Ghi chú: Khi sóng hồi active và hướng sóng khớp hướng kỹ thuật
          điểm tối đa chỉ là 60.
 """
 
+import asyncio
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ from typing import Optional
 
 import config
 import deriv_data
+from deriv_data import fetch_candles_batch
 from wave_analyzer import WaveContext, analyze_waves
 
 
@@ -95,7 +97,7 @@ def _bollinger(series: pd.Series,
 # Tính điểm tín hiệu cho một thị trường
 # ------------------------------------------------------------------
 
-def _score_signal(df: pd.DataFrame) -> MarketSignal:
+def _score_signal(df: pd.DataFrame, symbol: str = "") -> MarketSignal:
     """
     Phân tích DataFrame nến và tính điểm tín hiệu (0-100).
 
@@ -180,7 +182,7 @@ def _score_signal(df: pd.DataFrame) -> MarketSignal:
     # ── Tầng 2: Phân tích sóng (max 40 điểm) ─────────────────────
     wave_ctx: Optional[WaveContext] = None
     try:
-        wave_ctx = analyze_waves(df)
+        wave_ctx = analyze_waves(df, cache_key=symbol)
         if wave_ctx.is_wave_entry():
             wave_score = wave_ctx.entry_score   # 0-40
             if wave_ctx.entry_direction == "CALL":
@@ -232,13 +234,25 @@ def scan_all_markets(symbols: list[str] = config.SCAN_SYMBOLS) -> list[MarketSig
     """
     Quét tất cả thị trường trong danh sách, tính điểm từng thị trường.
 
+    Fetch dữ liệu nến cho tất cả symbol song song (asyncio.gather) thay vì
+    tuần tự, giảm tổng thời gian quét theo số symbol.
+
     Returns danh sách MarketSignal đã sắp xếp theo điểm giảm dần.
     """
+    candle_map = fetch_candles_batch(
+        symbols=symbols,
+        count=config.CANDLE_COUNT,
+        granularity=config.GRANULARITY,
+    )
+
     results = []
     for sym in symbols:
+        df = candle_map.get(sym)
+        if df is None or df.empty:
+            print(f"  [{sym}] ⚠️  Không có dữ liệu nến (fetch thất bại hoặc trống)")
+            continue
         try:
-            df  = deriv_data.fetch_candles(symbol=sym)
-            sig = _score_signal(df)
+            sig = _score_signal(df, symbol=sym)
             sig.symbol = sym
 
             wave_info = ""
@@ -255,7 +269,7 @@ def scan_all_markets(symbols: list[str] = config.SCAN_SYMBOLS) -> list[MarketSig
                 f"{wave_info}"
             )
         except Exception as exc:
-            print(f"  [{sym}] ⚠️  Không lấy được dữ liệu: {exc}")
+            print(f"  [{sym}] ⚠️  Lỗi xử lý tín hiệu: {exc}")
 
     results.sort(key=lambda s: s.score, reverse=True)
     return results

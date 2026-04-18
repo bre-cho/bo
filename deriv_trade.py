@@ -24,8 +24,12 @@ import config
 
 
 # ------------------------------------------------------------------
-# Xác thực và lấy số dư
+# Xác thực và lấy số dư  (với cache TTL để giảm round-trip)
 # ------------------------------------------------------------------
+
+_balance_cache: dict = {"value": None, "ts": 0.0}
+_BALANCE_CACHE_TTL   = 5.0   # giây
+
 
 async def _get_balance_async() -> Optional[float]:
     """Xác thực và lấy số dư tài khoản hiện tại."""
@@ -37,9 +41,31 @@ async def _get_balance_async() -> Optional[float]:
         return float(res["authorize"].get("balance", 0))
 
 
-def get_balance() -> float:
-    """Lấy số dư tài khoản (đồng bộ)."""
-    return asyncio.run(_get_balance_async())
+def get_balance(force_refresh: bool = False) -> float:
+    """
+    Lấy số dư tài khoản (đồng bộ).
+
+    Kết quả được cache trong _BALANCE_CACHE_TTL giây.
+    Truyền force_refresh=True để bỏ qua cache (dùng sau khi đặt lệnh thật).
+    """
+    now = time.monotonic()
+    if (
+        not force_refresh
+        and _balance_cache["value"] is not None
+        and (now - _balance_cache["ts"]) < _BALANCE_CACHE_TTL
+    ):
+        return _balance_cache["value"]
+
+    value = asyncio.run(_get_balance_async())
+    _balance_cache["value"] = value
+    _balance_cache["ts"]    = now
+    return value
+
+
+def invalidate_balance_cache() -> None:
+    """Xoá cache số dư — gọi sau khi đặt lệnh thật."""
+    _balance_cache["value"] = None
+    _balance_cache["ts"]    = 0.0
 
 
 # ------------------------------------------------------------------
@@ -152,7 +178,10 @@ def place_and_wait(contract_type: str,
     -------
     dict kết quả (xem _place_and_wait_async)
     """
-    return asyncio.run(_place_and_wait_async(contract_type, symbol, stake))
+    result = asyncio.run(_place_and_wait_async(contract_type, symbol, stake))
+    # Balance đã thay đổi sau khi đặt lệnh — xoá cache để cycle tiếp lấy lại
+    invalidate_balance_cache()
+    return result
 
 
 # ------------------------------------------------------------------

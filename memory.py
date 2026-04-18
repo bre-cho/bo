@@ -118,6 +118,8 @@ class MemoryBrain:
         )
         # Tải hard rules vào memory để tra vấn nhanh
         self._hard_rules: set[str] = self._load_hard_rules()
+        # Đếm số lệnh đã ghi để quyết định khi nào full-rebuild
+        self._record_count: int = 0
 
     # ── Helpers: xây dựng fingerprint ────────────────────────────
 
@@ -207,7 +209,8 @@ class MemoryBrain:
         Ghi nhận kết quả win/loss cho một lệnh đã thực thi.
 
         Lưu vào TẤT CẢ 3 level fingerprint để tra vấn đa cấp.
-        Tự động rebuild hard rules sau khi ghi.
+        Cập nhật luật cứng tăng dần (chỉ kiểm tra 3 fingerprint vừa thay đổi).
+        Mỗi MEMORY_REBUILD_INTERVAL lệnh thực hiện full-rebuild để nhất quán.
         """
         fp1 = self._make_fingerprint(f=features)
         fp2 = self._make_fingerprint_l2(f=features)
@@ -216,8 +219,17 @@ class MemoryBrain:
         for fp in (fp1, fp2, fp3):
             self._update_pattern(fp, won, pnl)
 
-        # Rebuild rules sau mỗi lần ghi để cập nhật luật cứng
-        self.rebuild_rules()
+        self._record_count += 1
+        if self._record_count % config.MEMORY_REBUILD_INTERVAL == 0:
+            # Full-rebuild định kỳ để đảm bảo nhất quán
+            self.rebuild_rules()
+        else:
+            # Cập nhật tăng dần: chỉ kiểm tra 3 fingerprint vừa thay đổi
+            changed = False
+            for fp in (fp1, fp2, fp3):
+                changed |= self._update_rule_for_fingerprint(fp)
+            if changed:
+                self._r.set(config.REDIS_MEMORY_RULES_KEY, json.dumps(list(self._hard_rules)))
 
         status = "WIN" if won else "LOSS"
         print(
@@ -252,6 +264,36 @@ class MemoryBrain:
             "total_pnl"  : float(data.get(b"total_pnl", 0)),
             "last_seen"  : data.get(b"last_seen", b"").decode(),
         }
+
+    def _update_rule_for_fingerprint(self, fingerprint: str) -> bool:
+        """
+        Kiểm tra và cập nhật trạng thái hard-rule cho một fingerprint đơn.
+
+        Returns True nếu trạng thái thay đổi (thêm hoặc xóa khỏi hard rules).
+        Dùng cho incremental update sau mỗi trade để tránh full scan_iter.
+        """
+        data = self._get_pattern(fingerprint)
+        if data is None:
+            return False
+
+        wins   = data["win_count"]
+        losses = data["loss_count"]
+        n      = wins + losses
+
+        if n < config.MEMORY_MIN_SAMPLES_FOR_RULE:
+            return False
+
+        loss_rate   = losses / n
+        should_block = loss_rate >= config.MEMORY_HARD_BLOCK_LOSS_RATE
+
+        was_blocked = fingerprint in self._hard_rules
+        if should_block and not was_blocked:
+            self._hard_rules.add(fingerprint)
+            return True
+        if not should_block and was_blocked:
+            self._hard_rules.discard(fingerprint)
+            return True
+        return False
 
     # ── Xây dựng luật cứng ───────────────────────────────────────
 
