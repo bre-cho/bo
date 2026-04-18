@@ -97,7 +97,7 @@ def _bollinger(series: pd.Series,
 # Tính điểm tín hiệu cho một thị trường
 # ------------------------------------------------------------------
 
-def _score_signal(df: pd.DataFrame) -> MarketSignal:
+def _score_signal(df: pd.DataFrame, symbol: str = "") -> MarketSignal:
     """
     Phân tích DataFrame nến và tính điểm tín hiệu (0-100).
 
@@ -182,7 +182,7 @@ def _score_signal(df: pd.DataFrame) -> MarketSignal:
     # ── Tầng 2: Phân tích sóng (max 40 điểm) ─────────────────────
     wave_ctx: Optional[WaveContext] = None
     try:
-        wave_ctx = analyze_waves(df)
+        wave_ctx = analyze_waves(df, cache_key=symbol)
         if wave_ctx.is_wave_entry():
             wave_score = wave_ctx.entry_score   # 0-40
             if wave_ctx.entry_direction == "CALL":
@@ -252,7 +252,7 @@ def scan_all_markets(symbols: list[str] = config.SCAN_SYMBOLS) -> list[MarketSig
             print(f"  [{sym}] ⚠️  Không có dữ liệu nến (fetch thất bại hoặc trống)")
             continue
         try:
-            sig = _score_signal(df)
+            sig = _score_signal(df, symbol=sym)
             sig.symbol = sym
 
             wave_info = ""

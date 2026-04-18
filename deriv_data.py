@@ -34,9 +34,10 @@ def fetch_candles_batch(
     granularity: int = config.GRANULARITY,
 ) -> Dict[str, pd.DataFrame]:
     """
-    Lấy nến cho nhiều symbol song song (asyncio.gather).
+    Lấy nến cho nhiều symbol trên một WebSocket duy nhất, xử lý song song.
 
-    Tiết kiệm thời gian so với gọi fetch_candles() tuần tự khi có nhiều symbol.
+    Dùng req_id để phân biệt response — tránh phải mở N handshake TCP/TLS.
+    Fallback tuần tự nếu server không trả đủ response trong thời gian quy định.
 
     Returns
     -------
@@ -44,23 +45,85 @@ def fetch_candles_batch(
     """
     return asyncio.run(_async_fetch_candles_batch(symbols, count, granularity))
 
+
 async def _async_fetch_candles_batch(
     symbols: list,
     count: int,
     granularity: int,
 ) -> Dict[str, pd.DataFrame]:
-    """Fetch nhiều symbol song song, trả về dict {symbol: DataFrame}."""
+    """
+    Fetch nhiều symbol trên một WebSocket duy nhất.
 
-    async def _fetch_one(sym: str):
-        try:
-            df = await _async_fetch_candles(sym, count, granularity)
-            return sym, df
-        except Exception as exc:
-            print(f"  [{sym}] ⚠️  fetch failed: {exc}")
-            return sym, pd.DataFrame()
+    Gửi tất cả request ngay sau khi kết nối, gắn req_id = index để
+    map response về đúng symbol, thu về bất đồng bộ.
+    """
+    if not symbols:
+        return {}
 
-    pairs = await asyncio.gather(*[_fetch_one(s) for s in symbols])
-    return dict(pairs)
+    results: Dict[str, pd.DataFrame] = {sym: pd.DataFrame() for sym in symbols}
+    req_id_to_sym: Dict[int, str] = {}
+
+    try:
+        async with websockets.connect(config.DERIV_WS_URL) as ws:
+            # Gửi tất cả request cùng lúc
+            for idx, sym in enumerate(symbols, start=1):
+                req = {
+                    "ticks_history"  : sym,
+                    "adjust_start_time": 1,
+                    "count"          : count,
+                    "end"            : "latest",
+                    "granularity"    : granularity,
+                    "start"          : 1,
+                    "style"          : "candles",
+                    "req_id"         : idx,
+                }
+                await ws.send(json.dumps(req))
+                req_id_to_sym[idx] = sym
+
+            # Thu response cho đến khi đủ hoặc hết timeout
+            remaining = set(symbols)
+            while remaining:
+                try:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=10.0)
+                except asyncio.TimeoutError:
+                    print(f"  ⚠️  [batch] Timeout — bỏ qua: {remaining}")
+                    break
+
+                response = json.loads(raw)
+                r_id = response.get("req_id")
+                sym  = req_id_to_sym.get(r_id)
+                if sym is None:
+                    continue
+
+                if "error" in response:
+                    print(f"  [{sym}] ⚠️  fetch failed: {response['error']['message']}")
+                else:
+                    candles = response.get("candles", [])
+                    if candles:
+                        df = pd.DataFrame(candles)
+                        df["epoch"] = pd.to_datetime(df["epoch"], unit="s")
+                        df = df.rename(columns={"epoch": "datetime"})
+                        df = df[["datetime", "open", "high", "low", "close"]].astype(
+                            {"open": float, "high": float, "low": float, "close": float}
+                        )
+                        results[sym] = df
+
+                remaining.discard(sym)
+
+    except Exception as exc:
+        print(f"  ⚠️  [batch] WebSocket error: {exc} — fallback to per-symbol fetch")
+        # Fallback: fetch song song từng symbol riêng lẻ
+        async def _fetch_one(sym: str):
+            try:
+                df = await _async_fetch_candles(sym, count, granularity)
+                return sym, df
+            except Exception as e:
+                print(f"  [{sym}] ⚠️  fetch failed: {e}")
+                return sym, pd.DataFrame()
+        pairs = await asyncio.gather(*[_fetch_one(s) for s in symbols])
+        results = dict(pairs)
+
+    return results
 
 
 

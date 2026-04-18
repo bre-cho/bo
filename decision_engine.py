@@ -26,6 +26,7 @@ Bạn chỉ cần giám sát. Hệ thống tự quyết định tất cả.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime
 from enum import Enum
@@ -36,7 +37,7 @@ import redis
 import config
 from brain        import pick_best_entry
 from risk_manager import RiskManager
-from deriv_trade  import get_balance, place_and_wait
+from deriv_trade  import get_balance, place_and_wait, invalidate_balance_cache
 from logger       import TradeLogger, TradeRecord
 from learner      import Learner
 from predictor    import predict, Prediction
@@ -140,6 +141,10 @@ class DecisionEngine:
         self._active_symbols     = self._load_active_symbols()
         self._mode               = self._load_mode()
         self._cycle_count        = 0
+
+        # Background-task lock: prevents SSOL/Empire/AEE from running concurrently
+        self._bg_lock    = threading.Lock()
+        self._bg_running = False
 
         # ── New components ────────────────────────────────────────
         if _HAS_NEW_COMPONENTS:
@@ -615,7 +620,8 @@ class DecisionEngine:
                 from ml_models import EnsembleScorer
                 from feature_pipeline import build_training_dataset
                 import json as _json
-                raw_history   = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
+                _window = getattr(config, "TRADE_LOG_WINDOW", 200)
+                raw_history   = self._r.lrange(config.REDIS_LOG_KEY, 0, _window - 1)
                 trade_history = [_json.loads(r) for r in raw_history]
                 # Use candle library if available, else fetch fresh
                 if self.candle_lib is not None:
@@ -906,6 +912,28 @@ class DecisionEngine:
         except Exception as exc:
             print(f"  🧬 [AEE] Lỗi: {exc}")
 
+    # ── Background task runner ────────────────────────────────────
+
+    def _run_in_background(self, target_fn) -> None:
+        """
+        Chạy target_fn trong thread nền (daemon).
+
+        Dùng _bg_lock để đảm bảo chỉ một heavy background task
+        (SSOL / Empire / AEE) chạy tại một thời điểm, tránh tranh chấp
+        Redis và tránh block vòng lặp chính.
+        """
+        def _wrapper():
+            if not self._bg_lock.acquire(blocking=False):
+                print("  ⏭️  [BG] Bỏ qua — background task khác đang chạy.")
+                return
+            try:
+                target_fn()
+            finally:
+                self._bg_lock.release()
+
+        t = threading.Thread(target=_wrapper, daemon=True)
+        t.start()
+
     def print_dashboard(self, balance: float, mode: SystemMode) -> None:
         """In dashboard giám sát cho operator."""
         params    = self.learner.get_params()
@@ -1043,6 +1071,12 @@ class DecisionEngine:
 
         print(f"\n  [{datetime.now()}] Engine ONLINE. Nhấn Ctrl+C để dừng.\n")
 
+        # Đọc 1 lần trước vòng lặp thay vì getattr mỗi cycle
+        _ssol_interval   = getattr(config, "SSOL_CYCLE_INTERVAL",   50)
+        _empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+        _aee_interval    = getattr(config, "AEE_CYCLE_INTERVAL",    200)
+        _stats_interval  = getattr(config, "STATS_PRINT_INTERVAL",    5)
+
         while True:
             try:
                 self._cycle_count += 1
@@ -1082,28 +1116,24 @@ class DecisionEngine:
                     if self._cycle_count % config.SCALE_INTERVAL_CYCLES == 0:
                         self.self_scale()
 
-                    # ⑨ sovereign oversight (mỗi SSOL_CYCLE_INTERVAL chu kỳ)
-                    ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
-                    if ssol_interval > 0 and self._cycle_count % ssol_interval == 0:
-                        self.trigger_sovereign_oversight()
+                    # ⑨ sovereign oversight — chạy nền, không block cycle
+                    if _ssol_interval > 0 and self._cycle_count % _ssol_interval == 0:
+                        self._run_in_background(self.trigger_sovereign_oversight)
 
-                    # ⑩ empire control (mỗi EMPIRE_CYCLE_INTERVAL chu kỳ)
-                    empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
-                    if empire_interval > 0 and self._cycle_count % empire_interval == 0:
-                        self.trigger_empire_control()
+                    # ⑩ empire control — chạy nền, không block cycle
+                    if _empire_interval > 0 and self._cycle_count % _empire_interval == 0:
+                        self._run_in_background(self.trigger_empire_control)
 
-                    # ⑪ autonomous evolution (mỗi AEE_CYCLE_INTERVAL chu kỳ)
-                    aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
-                    if aee_interval > 0 and self._cycle_count % aee_interval == 0:
-                        self.trigger_autonomous_evolution()
+                    # ⑪ autonomous evolution — chạy nền, không block cycle
+                    if _aee_interval > 0 and self._cycle_count % _aee_interval == 0:
+                        self._run_in_background(self.trigger_autonomous_evolution)
 
                     # ④ tự hành động — qua pipeline
                     self.run_live_cycle(balance=balance)
 
                 print(f"\n  {self.risk.summary()}")
-                # In stats mỗi STATS_PRINT_INTERVAL chu kỳ để giảm tải Redis
-                stats_interval = getattr(config, "STATS_PRINT_INTERVAL", 5)
-                if stats_interval <= 0 or self._cycle_count % stats_interval == 0:
+                # In stats mỗi _stats_interval chu kỳ để giảm tải Redis
+                if _stats_interval <= 0 or self._cycle_count % _stats_interval == 0:
                     self.logger.print_stats()
 
                 # In pipeline + memory report mỗi 10 chu kỳ
