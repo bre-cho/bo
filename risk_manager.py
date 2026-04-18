@@ -105,13 +105,14 @@ class RiskManager:
     # Kiểm tra có được phép giao dịch không
     # ----------------------------------------------------------
 
-    def can_trade(self, balance: float = 0.0) -> tuple[bool, str]:
+    def can_trade(self, balance: float = 0.0, direction: str = "both") -> tuple[bool, str]:
         """
         Returns (allowed: bool, reason: str).
 
         Kiểm tra các điều kiện:
           1. Đang trong thời gian cooldown?
           2. Lỗ ngày vượt quá giới hạn?
+          3. ControlSystem: Daily TP/SL + Wave filter
         """
         self._reset_if_new_day()
 
@@ -134,6 +135,19 @@ class RiskManager:
                     f"Đã lỗ {abs(self.state.daily_pnl):.2f} USD trong ngày "
                     f"(giới hạn {max_daily_loss:.2f} USD)"
                 )
+
+        # 3. ControlSystem: Daily TP/SL + Wave direction filter
+        try:
+            from control_system import ControlSystem
+            ctrl = ControlSystem()
+            allowed, reason = ctrl.can_trade(
+                daily_pnl=self.state.daily_pnl,
+                direction=direction,
+            )
+            if not allowed:
+                return False, reason
+        except Exception:
+            pass  # ControlSystem optional — degrade gracefully
 
         return True, "OK"
 
