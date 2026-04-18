@@ -1101,7 +1101,10 @@ class DecisionEngine:
                     self.run_live_cycle(balance=balance)
 
                 print(f"\n  {self.risk.summary()}")
-                self.logger.print_stats()
+                # In stats mỗi STATS_PRINT_INTERVAL chu kỳ để giảm tải Redis
+                stats_interval = getattr(config, "STATS_PRINT_INTERVAL", 5)
+                if stats_interval <= 0 or self._cycle_count % stats_interval == 0:
+                    self.logger.print_stats()
 
                 # In pipeline + memory report mỗi 10 chu kỳ
                 if self._cycle_count % 10 == 0:

@@ -183,15 +183,17 @@ def create_app():
         size: int = Query(20, ge=1, le=100),
         r: redis.Redis = Depends(get_redis),
     ):
-        raw_list = r.lrange(config.REDIS_LOG_KEY, 0, -1)
+        # Đọc đúng window cần thiết thay vì toàn bộ danh sách
+        total = r.llen(config.REDIS_LOG_KEY)
+        start = (page - 1) * size
+        end   = start + size - 1          # lrange end là inclusive
+        raw_list = r.lrange(config.REDIS_LOG_KEY, start, end)
         records  = [json.loads(x) for x in raw_list]
-        start    = (page - 1) * size
-        end      = start + size
         return {
-            "total"  : len(records),
+            "total"  : total,
             "page"   : page,
             "size"   : size,
-            "records": records[start:end],
+            "records": records,
         }
 
     # ── Balance (read-only) ───────────────────────────────────────

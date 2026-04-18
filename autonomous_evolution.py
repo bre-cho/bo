@@ -253,13 +253,14 @@ class WeaknessDetector:
         return weaknesses
 
     def _read_trade_stats(self) -> Optional[dict]:
-        """Đọc thống kê giao dịch từ Redis."""
+        """Đọc thống kê giao dịch từ Redis (giới hạn TRADE_LOG_WINDOW bản ghi gần nhất)."""
         try:
             import redis as _redis
             r = _redis.Redis(
                 host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB
             )
-            raw = r.lrange(config.REDIS_LOG_KEY, 0, -1)
+            window = getattr(config, "TRADE_LOG_WINDOW", 200)
+            raw = r.lrange(config.REDIS_LOG_KEY, 0, window - 1)
             if not raw:
                 return None
             records = [json.loads(x) for x in raw]

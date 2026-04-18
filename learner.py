@@ -91,8 +91,9 @@ class Learner:
     # ── Load history ──────────────────────────────────────────────
 
     def _load_trade_history(self) -> list[dict]:
-        """Tải lịch sử giao dịch từ Redis."""
-        raw_list = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
+        """Tải lịch sử giao dịch từ Redis (giới hạn TRADE_LOG_WINDOW bản ghi gần nhất)."""
+        window   = getattr(config, "TRADE_LOG_WINDOW", 200)
+        raw_list = self._r.lrange(config.REDIS_LOG_KEY, 0, window - 1)
         records  = []
         for raw in raw_list:
             try:

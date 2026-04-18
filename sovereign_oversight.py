@@ -275,6 +275,11 @@ class ClusterTelemetryCollector:
         Returns dict {cluster_id: ClusterTelemetry}.
         Missing clusters trả về telemetry với n_trades=0.
         """
+        # Giới hạn số bản ghi đọc: window * số cluster, tối đa TRADE_LOG_WINDOW
+        read_limit = min(
+            self._window * max(len(cluster_ids), 1),
+            getattr(config, "TRADE_LOG_WINDOW", 200),
+        )
         try:
             import redis as _redis
             r = _redis.Redis(
@@ -282,7 +287,7 @@ class ClusterTelemetryCollector:
                 port=config.REDIS_PORT,
                 db=config.REDIS_DB,
             )
-            raw_list = r.lrange(config.REDIS_LOG_KEY, 0, -1)
+            raw_list = r.lrange(config.REDIS_LOG_KEY, 0, read_limit - 1)
         except Exception:
             raw_list = []
 

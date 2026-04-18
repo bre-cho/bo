@@ -71,6 +71,7 @@ STAKE_MAX_USD    = 50.0   # Lệnh tối đa (USD)
 # --- Redis keys cho trạng thái tự vận hành ---
 REDIS_STATE_KEY   = "Deriv_Robot_State"    # Hash: trạng thái rủi ro
 REDIS_LOG_KEY     = "Deriv_Trade_Log"      # List: lịch sử lệnh (JSON)
+REDIS_STATS_SUMMARY_KEY = "Deriv_Trade_Stats_Summary"  # Hash: thống kê tích lũy tăng dần
 
 # --- File log giao dịch ---
 TRADE_LOG_FILE = "trade_log.csv"
@@ -124,6 +125,12 @@ LEARNER_INTERVAL_CYCLES = 10
 
 # Win rate < ngưỡng này → điều kiện tín hiệu bị đánh dấu "yếu"
 LEARNER_WEAK_WIN_RATE   = 0.45   # 45%
+
+# Số lệnh gần nhất dùng khi đọc trade log cho analytics (giới hạn tải Redis)
+TRADE_LOG_WINDOW        = 200
+
+# In thống kê giao dịch đầy đủ mỗi N chu kỳ (0 = mỗi chu kỳ)
+STATS_PRINT_INTERVAL    = 5
 
 # ============================================================
 # PREDICTOR — Tự dự đoán (Self-Predict)
@@ -214,6 +221,9 @@ REDIS_MEMORY_RULES_KEY       = "Deriv_Mem_Rules"
 
 # Redis key lưu tổng hợp thống kê memory (JSON)
 REDIS_MEMORY_STATS_KEY       = "Deriv_Mem_Stats"
+
+# Số lệnh giữa 2 lần full rebuild memory rules (giảm overhead scan_iter)
+MEMORY_REBUILD_INTERVAL      = 20
 
 # ============================================================
 # CANDLE LIBRARY — Thư viện nến 10.000 mẫu

@@ -10,6 +10,7 @@ import redis
 import pandas as pd
 import websockets
 from datetime import datetime
+from typing import Dict
 
 import config
 
@@ -25,6 +26,42 @@ def fetch_candles(symbol: str = config.SYMBOL,
     pd.DataFrame với các cột: open, high, low, close, epoch
     """
     return asyncio.run(_async_fetch_candles(symbol, count, granularity))
+
+
+def fetch_candles_batch(
+    symbols: list,
+    count: int = config.CANDLE_COUNT,
+    granularity: int = config.GRANULARITY,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Lấy nến cho nhiều symbol song song (asyncio.gather).
+
+    Tiết kiệm thời gian so với gọi fetch_candles() tuần tự khi có nhiều symbol.
+
+    Returns
+    -------
+    dict {symbol: pd.DataFrame}  — DataFrame rỗng nếu symbol bị lỗi.
+    """
+    return asyncio.run(_async_fetch_candles_batch(symbols, count, granularity))
+
+async def _async_fetch_candles_batch(
+    symbols: list,
+    count: int,
+    granularity: int,
+) -> Dict[str, pd.DataFrame]:
+    """Fetch nhiều symbol song song, trả về dict {symbol: DataFrame}."""
+
+    async def _fetch_one(sym: str):
+        try:
+            df = await _async_fetch_candles(sym, count, granularity)
+            return sym, df
+        except Exception as exc:
+            print(f"  [{sym}] ⚠️  fetch failed: {exc}")
+            return sym, pd.DataFrame()
+
+    pairs = await asyncio.gather(*[_fetch_one(s) for s in symbols])
+    return dict(pairs)
+
 
 
 async def _async_fetch_candles(symbol: str, count: int, granularity: int) -> pd.DataFrame:
