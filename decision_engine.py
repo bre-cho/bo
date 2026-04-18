@@ -65,10 +65,11 @@ except ImportError as _e:
 # ──────────────────────────────────────────────────────────────────
 
 class SystemMode(str, Enum):
-    LIVE     = "LIVE"
-    PAPER    = "PAPER"
-    PAUSED   = "PAUSED"
-    LEARNING = "LEARNING"
+    LIVE      = "LIVE"
+    PAPER     = "PAPER"
+    PAUSED    = "PAUSED"
+    LEARNING  = "LEARNING"
+    EVOLVING  = "EVOLVING"
 
 
 _REDIS_MODE_KEY       = "Deriv_System_Mode"
@@ -626,6 +627,11 @@ class DecisionEngine:
             except Exception as exc:
                 print(f"  🤖 [ML] Retrain failed: {exc}")
 
+        # ── Evolution cycle (if enabled and interval reached) ─────
+        evol_interval = getattr(config, "EVOL_AUTO_INTERVAL", 0)
+        if evol_interval > 0 and self._cycle_count % evol_interval == 0:
+            self.trigger_evolution()
+
     # ── ⑦ tự mô phỏng on-demand ──────────────────────────────────
 
     def run_simulation(self, symbol: str) -> None:
@@ -642,6 +648,53 @@ class DecisionEngine:
             )
         except Exception as exc:
             print(f"  🔬 [Sim] Lỗi backtest {symbol}: {exc}")
+
+    # ── ⑧ tự tiến hóa ────────────────────────────────────────────
+
+    def trigger_evolution(
+        self,
+        generations: int = None,
+        pop_size   : int = None,
+        n_envs     : int = None,
+    ) -> None:
+        """
+        Chạy một chu kỳ tiến hóa (Self-Play + Genetic Algorithm).
+
+        Quy trình:
+          1. Sinh quần thể chiến lược (genomes)
+          2. Cho cạnh tranh trong đấu trường môi trường đa dạng
+          3. Chọn kẻ thắng, lai ghép + đột biến → thế hệ mới
+          4. Lặp lại N thế hệ
+          5. Thăng chức champion lên Redis → áp dụng ngay vào engine
+
+        Kết quả:
+          - config.MIN_SIGNAL_SCORE cập nhật theo champion
+          - config.RSI_OVERSOLD / RSI_OVERBOUGHT cập nhật
+          - Genome tốt nhất lưu vào Redis + file models/champion_genome.json
+        """
+        prev_mode = self._mode
+        self._save_mode(SystemMode.EVOLVING)
+        try:
+            from evolution_engine import run_evolution_cycle, apply_champion_to_config
+            print(f"\n  🧬 [Evolution] Starting self-play evolution cycle...")
+            champion = run_evolution_cycle(
+                generations = generations or config.EVOL_GENERATIONS,
+                pop_size    = pop_size    or config.EVOL_POP_SIZE,
+                n_envs      = n_envs      or config.EVOL_N_ENVIRONMENTS,
+                verbose     = True,
+            )
+            if config.EVOL_AUTO_PROMOTE and champion.fitness > 0.01:
+                apply_champion_to_config()
+                print(
+                    f"  🧬 [Evolution] Champion applied: "
+                    f"min_score={config.MIN_SIGNAL_SCORE:.1f}  "
+                    f"rsi_os={config.RSI_OVERSOLD:.1f}  "
+                    f"rsi_ob={config.RSI_OVERBOUGHT:.1f}"
+                )
+        except Exception as exc:
+            print(f"  🧬 [Evolution] Failed: {exc}")
+        finally:
+            self._save_mode(prev_mode)
 
     # ── ⑧ tự scale ───────────────────────────────────────────────
 

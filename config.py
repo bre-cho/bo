@@ -307,3 +307,29 @@ SYNTH_BLEND_RATIO        = 0.50
 SYNTH_AUTO_BOOST         = True
 # Chạy synthetic training khi khởi động lần đầu (cold start)
 SYNTH_COLD_START         = True
+
+# ============================================================
+# EVOLUTION ENGINE — Self-Play + Simulation Environment
+# ============================================================
+# Kích thước quần thể (số genomes mỗi thế hệ)
+EVOL_POP_SIZE            = 30
+# Số thế hệ tiến hóa mỗi lần chạy
+EVOL_GENERATIONS         = 10
+# Số môi trường thị trường (regime environments) mỗi genome phải vượt qua
+EVOL_N_ENVIRONMENTS      = 8
+# Số nến trong mỗi môi trường (nhiều hơn = chính xác hơn, chậm hơn)
+EVOL_ENV_CANDLES         = 200
+# Số elites được bảo toàn qua mỗi thế hệ (không đột biến)
+EVOL_N_ELITES            = 4
+# Tỉ lệ đột biến mỗi gene (0.15 = 15% gene bị thay đổi)
+EVOL_MUTATION_RATE       = 0.15
+# Độ lớn đột biến (tỉ lệ range của gene)
+EVOL_MUTATION_SIGMA      = 0.12
+# Tỉ lệ lai ghép (xác suất thực hiện crossover thay vì copy)
+EVOL_CROSSOVER_RATE      = 0.70
+# Kích thước tournament (k candidate) trong tournament selection
+EVOL_TOURNAMENT_K        = 4
+# Tự động chạy evolution sau mỗi N learning cycles
+EVOL_AUTO_INTERVAL       = 100  # chu kỳ (0 = tắt)
+# Tự áp dụng champion genome lên config khi evolution xong
+EVOL_AUTO_PROMOTE        = True

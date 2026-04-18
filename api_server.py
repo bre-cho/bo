@@ -348,6 +348,102 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
+    # ── Evolution Engine ──────────────────────────────────────────
+    class EvolutionRunRequest(BaseModel):
+        generations : int  = config.EVOL_GENERATIONS
+        pop_size    : int  = config.EVOL_POP_SIZE
+        n_envs      : int  = config.EVOL_N_ENVIRONMENTS
+        env_candles : int  = config.EVOL_ENV_CANDLES
+        seed        : int  = 42
+
+    @app.post("/evolution/run")
+    async def evolution_run(req: EvolutionRunRequest):
+        """
+        Trigger a full evolution cycle (Self-Play + Genetic Algorithm).
+
+        Runs synchronously (may take 30–120s depending on settings).
+        Use small generations/pop_size for quick API tests.
+        """
+        try:
+            from evolution_engine import run_evolution_cycle
+            champion = run_evolution_cycle(
+                generations = req.generations,
+                pop_size    = req.pop_size,
+                n_envs      = req.n_envs,
+                env_candles = req.env_candles,
+                seed        = req.seed,
+                verbose     = False,
+            )
+            return {
+                "status"    : "ok",
+                "message"   : "Evolution complete",
+                "champion"  : {
+                    "genome_id"         : champion.genome_id,
+                    "generation"        : champion.generation,
+                    "fitness"           : round(champion.fitness, 6),
+                    "win_rate_pct"      : round(champion.win_rate_pct, 2),
+                    "profit_factor"     : round(champion.profit_factor, 4),
+                    "n_trades"          : champion.n_trades,
+                    "min_signal_score"  : round(champion.min_signal_score, 2),
+                    "lookahead_candles" : champion.lookahead_candles,
+                    "rsi_oversold"      : round(champion.rsi_oversold, 2),
+                    "rsi_overbought"    : round(champion.rsi_overbought, 2),
+                    "wave_weight"       : round(champion.wave_weight, 3),
+                    "genes"             : {k: round(v, 4) for k, v in champion.genes().items()},
+                },
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/evolution/status")
+    async def evolution_status():
+        """
+        Return current champion genome + evolution history summary.
+        """
+        try:
+            from evolution_engine import get_evolution_status
+            return get_evolution_status()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/evolution/champion")
+    async def evolution_champion():
+        """Return current champion genome details."""
+        try:
+            from evolution_engine import load_champion
+            champion = load_champion()
+            if champion is None:
+                return {"status": "no_champion", "champion": None}
+            return {
+                "status"  : "ok",
+                "champion": champion.to_dict(),
+                "genes"   : {k: round(v, 4) for k, v in champion.genes().items()},
+                "summary" : champion.summary(),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/evolution/promote")
+    async def evolution_promote():
+        """Apply current champion genome params to live config."""
+        try:
+            from evolution_engine import apply_champion_to_config
+            champion = apply_champion_to_config()
+            if champion is None:
+                return {"status": "no_champion", "applied": False}
+            return {
+                "status"           : "ok",
+                "applied"          : True,
+                "min_signal_score" : config.MIN_SIGNAL_SCORE,
+                "rsi_oversold"     : config.RSI_OVERSOLD,
+                "rsi_overbought"   : config.RSI_OVERBOUGHT,
+                "lookahead_candles": config.SIM_LOOKAHEAD_CANDLES,
+                "genome_id"        : champion.genome_id,
+                "fitness"          : champion.fitness,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return app
 
 

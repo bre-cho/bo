@@ -403,6 +403,143 @@ async function previewSyntheticData() {
   }
 }
 
+// ── Evolution Engine ─────────────────────────────────────────────
+async function runEvolution() {
+  const gens    = parseInt(document.getElementById('evol-gens').value)    || 10;
+  const pop     = parseInt(document.getElementById('evol-pop').value)     || 20;
+  const envs    = parseInt(document.getElementById('evol-envs').value)    || 6;
+  const candles = parseInt(document.getElementById('evol-candles').value) || 150;
+
+  const btn     = document.getElementById('evol-run-btn');
+  const prog    = document.getElementById('evol-progress');
+  const label   = document.getElementById('evol-progress-label');
+
+  btn.disabled      = true;
+  prog.style.display = '';
+  label.textContent  = `Đang tiến hóa… (${gens} thế hệ × pop=${pop})`;
+
+  const result = await apiPost('/evolution/run', {
+    generations : gens,
+    pop_size    : pop,
+    n_envs      : envs,
+    env_candles : candles,
+    seed        : 42,
+  });
+
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  if (result && result.status === 'ok') {
+    renderEvolutionChampion(result.champion);
+    showToast('Evolution hoàn thành! Champion đã được lưu.', 'success');
+    await loadEvolutionStatus();
+  } else {
+    showToast('Lỗi Evolution — kiểm tra console server', 'danger');
+  }
+}
+
+async function loadEvolutionStatus() {
+  const result = await apiGet('/evolution/status');
+  if (!result) return;
+
+  if (result.champion) {
+    renderEvolutionChampion(result.champion);
+  }
+
+  if (result.history && result.history.length > 0) {
+    renderEvolutionHistory(result.history);
+  }
+}
+
+async function promoteChampion() {
+  const result = await apiPost('/evolution/promote', {});
+  if (result && result.applied) {
+    showToast(
+      `Champion áp dụng! min_score=${result.min_signal_score?.toFixed(1)} ` +
+      `rsi_os=${result.rsi_oversold?.toFixed(1)}`, 'success'
+    );
+    await loadStats();
+  } else {
+    showToast('Không có champion để áp dụng', 'warning');
+  }
+}
+
+function renderEvolutionChampion(c) {
+  const card = document.getElementById('evol-champion-card');
+  const body = document.getElementById('evol-champion-body');
+  if (!card || !body || !c) return;
+
+  card.style.display = '';
+  const fitness = (c.fitness || 0).toFixed(4);
+  const wr      = (c.win_rate_pct || 0).toFixed(1);
+  const pf      = (c.profit_factor || 0).toFixed(2);
+  const genes   = c.genes || {};
+
+  body.innerHTML = `
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <span class="badge bg-success">Fitness: ${fitness}</span>
+      <span class="badge bg-info">Win Rate: ${wr}%</span>
+      <span class="badge bg-primary">PF: ${pf}</span>
+      <span class="badge bg-secondary">Trades: ${c.n_trades || 0}</span>
+      <span class="badge bg-dark border border-secondary">Gen: ${c.generation || 0}</span>
+      <span class="badge bg-dark border border-secondary">#${c.genome_id || '?'}</span>
+    </div>
+    <div class="row g-2 small text-muted">
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">min_signal_score</div>
+          <div class="gene-value text-warning">${(c.min_signal_score || 60).toFixed(1)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">lookahead_candles</div>
+          <div class="gene-value text-info">${c.lookahead_candles || 5}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">rsi_oversold / overbought</div>
+          <div class="gene-value text-success">${(c.rsi_oversold||30).toFixed(1)} / ${(c.rsi_overbought||70).toFixed(1)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">wave_weight</div>
+          <div class="gene-value text-primary">${(genes.wave_weight || c.wave_weight || 1).toFixed(3)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">rsi_weight</div>
+          <div class="gene-value">${(genes.rsi_weight||1).toFixed(3)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="gene-card">
+          <div class="gene-label">macd_weight</div>
+          <div class="gene-value">${(genes.macd_weight||1).toFixed(3)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderEvolutionHistory(history) {
+  const card  = document.getElementById('evol-history-card');
+  const tbody = document.querySelector('#evol-history-table tbody');
+  if (!card || !tbody) return;
+
+  card.style.display = '';
+  tbody.innerHTML = history.slice(-20).reverse().map(row => `
+    <tr>
+      <td>${row.generation}</td>
+      <td class="text-success">${(row.best_fitness||0).toFixed(4)}</td>
+      <td>${(row.mean_fitness||0).toFixed(4)}</td>
+      <td>${(row.best_win_rate||0).toFixed(1)}%</td>
+      <td>${(row.best_pf||0).toFixed(2)}</td>
+    </tr>`).join('');
+}
+
 // ── Utilities ─────────────────────────────────────────────────────
 function setText(id, v) {
   const el = document.getElementById(id);
@@ -439,4 +576,9 @@ document.addEventListener('DOMContentLoaded', () => {
   onStrategyChange();
   // Listen for base stake changes to update Victor display
   document.getElementById('base-stake').addEventListener('input', onStrategyChange);
+
+  // Load evolution status when evolution tab is clicked
+  document.querySelectorAll('[href="#tab-evolution"]').forEach(el => {
+    el.addEventListener('click', () => loadEvolutionStatus());
+  });
 });

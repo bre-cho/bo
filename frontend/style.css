@@ -97,3 +97,14 @@ body { font-size: 0.875rem; }
   text-align: center;
   color: #e5e7eb;
 }
+
+/* Evolution Engine gene display */
+.gene-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+}
+.gene-label { color: #6b7280; margin-bottom: 2px; }
+.gene-value { color: #e5e7eb; font-weight: 600; font-size: 0.90rem; }

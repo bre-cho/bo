@@ -31,6 +31,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-strategy">💼 Chiến lược vốn</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-control">⚙️ Kiểm soát</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Synthetic Engine</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evolution">🧬 Evolution</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
@@ -389,6 +390,165 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- =================== EVOLUTION ENGINE =================== -->
+  <div class="tab-pane fade" id="tab-evolution">
+    <div class="row g-3">
+
+      <!-- Left: controls -->
+      <div class="col-md-5">
+        <div class="card card-dark">
+          <div class="card-header">🧬 Self-Play Evolution Engine</div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Hệ tự sinh chiến lược → cạnh tranh trong đấu trường → tiến hóa tự nhiên.<br>
+              <em>Genetic Algorithm trên không gian tham số giao dịch.</em>
+            </p>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label text-muted small">Số thế hệ</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="evol-gens" value="10" min="3" max="100">
+              </div>
+              <div class="col-6">
+                <label class="form-label text-muted small">Kích thước quần thể</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="evol-pop" value="20" min="6" max="100">
+              </div>
+              <div class="col-6">
+                <label class="form-label text-muted small">Số môi trường</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="evol-envs" value="6" min="2" max="20">
+              </div>
+              <div class="col-6">
+                <label class="form-label text-muted small">Nến/môi trường</label>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
+                       id="evol-candles" value="150" min="80" max="500" step="10">
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button class="btn btn-success flex-grow-1" onclick="runEvolution()" id="evol-run-btn">
+                <i class="bi bi-play-circle"></i> Bắt đầu tiến hóa
+              </button>
+              <button class="btn btn-outline-warning" onclick="loadEvolutionStatus()">
+                <i class="bi bi-arrow-repeat"></i> Trạng thái
+              </button>
+            </div>
+
+            <div id="evol-progress" class="mt-3" style="display:none">
+              <div class="progress bg-dark mb-1">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                     style="width: 100%"></div>
+              </div>
+              <div class="text-muted small text-center" id="evol-progress-label">
+                Đang tiến hóa…
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Genetic operators overview -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Toán tử di truyền</div>
+          <div class="card-body p-2">
+            <div class="small text-muted">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-success">Elitism</span>
+                <span>Top-K genome bảo toàn qua mỗi thế hệ</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-info">Tournament</span>
+                <span>Chọn cha mẹ bằng k-tournament selection</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary">Crossover</span>
+                <span>Uniform + BLX-α blend: mix genes giữa 2 cha mẹ</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-warning text-dark">Mutation</span>
+                <span>Gaussian perturbation + occasional large jump</span>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">Diversity</span>
+                <span>10% hoàn toàn random để tránh local optima</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gene space -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Không gian gene (13 chiều)</div>
+          <div class="card-body p-2">
+            <div class="small text-muted">
+              <div class="mb-1"><strong class="text-light">RSI:</strong> oversold, overbought, near_os, near_ob</div>
+              <div class="mb-1"><strong class="text-light">Weights:</strong> rsi_w, momentum_w, macd_w, bb_w, wave_w</div>
+              <div class="mb-1"><strong class="text-light">Filters:</strong> min_signal_score, min_wave_score, bb_threshold</div>
+              <div><strong class="text-light">Trade:</strong> lookahead_candles (2–15)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: champion + history -->
+      <div class="col-md-7">
+
+        <!-- Champion card -->
+        <div class="card card-dark" id="evol-champion-card" style="display:none">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>🏆 Champion Genome</span>
+            <button class="btn btn-sm btn-outline-success" onclick="promoteChampion()">
+              <i class="bi bi-lightning-charge"></i> Áp dụng live
+            </button>
+          </div>
+          <div class="card-body" id="evol-champion-body"></div>
+        </div>
+
+        <!-- Generation history chart (table) -->
+        <div class="card card-dark mt-3" id="evol-history-card" style="display:none">
+          <div class="card-header text-muted small">Lịch sử tiến hóa theo thế hệ</div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:260px;overflow-y:auto">
+              <table class="table table-dark table-sm mb-0" id="evol-history-table">
+                <thead class="sticky-top bg-dark">
+                  <tr>
+                    <th>Gen</th>
+                    <th>Best Fitness</th>
+                    <th>Mean Fitness</th>
+                    <th>Win Rate</th>
+                    <th>PF</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Environment summary -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">10 loại môi trường đấu trường</div>
+          <div class="card-body p-2">
+            <div class="d-flex flex-wrap gap-1">
+              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑ Trend UP</span>
+              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑↑ Strong Trend UP</span>
+              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓ Trend DOWN</span>
+              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓↓ Strong Trend DOWN</span>
+              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔ Choppy</span>
+              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔↔ High Vol Choppy</span>
+              <span class="badge bg-warning bg-opacity-25 border border-warning text-warning">💥 Crash</span>
+              <span class="badge bg-info bg-opacity-25 border border-info text-info">🚀 Spike</span>
+              <span class="badge bg-info bg-opacity-25 border border-info text-info">🔄 Recovery</span>
+              <span class="badge bg-primary bg-opacity-25 border border-primary text-primary">🔀 Mixed Markov</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
