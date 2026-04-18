@@ -862,6 +862,96 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
+    # ── Sovereign Oversight Layer (SSOL) ──────────────────────────
+
+    @app.get("/sovereign/report")
+    async def sovereign_report():
+        """
+        Return latest Sovereign Oversight Layer report:
+          network phase, cluster verdicts, resource budgets,
+          guardrail alerts, strategic lessons, insights.
+        """
+        try:
+            from sovereign_oversight import get_sovereign_report
+            return get_sovereign_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class SovereignRunRequest(BaseModel):
+        symbols    : List[str] = []
+        verbose    : bool      = False
+
+    @app.post("/sovereign/run")
+    async def sovereign_run(req: SovereignRunRequest):
+        """
+        Trigger a full SSOL cycle on demand.
+
+        symbols: list of cluster IDs (defaults to config.SCAN_SYMBOLS).
+        Respects SSOL_SHADOW_MODE from config.
+        """
+        try:
+            from sovereign_oversight import run_sovereign_cycle
+            symbols = req.symbols or list(config.SCAN_SYMBOLS)
+            report  = run_sovereign_cycle(active_symbols=symbols, verbose=req.verbose)
+            return {
+                "status"               : "ok",
+                "network_phase"        : report.network_phase,
+                "network_health_score" : report.network_health_score,
+                "n_clusters_total"     : report.n_clusters_total,
+                "n_clusters_active"    : report.n_clusters_active,
+                "n_clusters_quarantined": report.n_clusters_quarantined,
+                "n_clusters_dead"      : report.n_clusters_dead,
+                "shadow_mode"          : report.shadow_mode,
+                "cluster_verdicts"     : report.cluster_verdicts,
+                "resource_budgets"     : report.resource_budgets,
+                "guardrail_alerts"     : report.guardrail_alerts,
+                "strategic_lessons"    : report.strategic_lessons,
+                "insights"             : report.insights,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/sovereign/memory")
+    async def sovereign_memory(n: int = Query(default=20, ge=1, le=100)):
+        """
+        Return recent strategic lessons from SSOL memory.
+
+        Bài học được ghi khi cluster bị KILL/QUARANTINE/REVIVE.
+        """
+        try:
+            from sovereign_oversight import StrategicMemory
+            mem     = StrategicMemory()
+            lessons = mem.get_recent(n=n)
+            return {
+                "status"  : "ok",
+                "n"       : len(lessons),
+                "lessons" : lessons,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class SovereignModeRequest(BaseModel):
+        shadow_mode: bool
+
+    @app.post("/sovereign/mode")
+    async def sovereign_set_mode(req: SovereignModeRequest):
+        """
+        Toggle SSOL shadow mode.
+
+        shadow_mode=True  → khuyến nghị chỉ (phase 2)
+        shadow_mode=False → enforce verdicts (phase 3-4)
+        """
+        config.SSOL_SHADOW_MODE = req.shadow_mode
+        return {
+            "status"     : "ok",
+            "shadow_mode": config.SSOL_SHADOW_MODE,
+            "message"    : (
+                "Shadow mode ON — chỉ log khuyến nghị"
+                if req.shadow_mode
+                else "Enforce mode ON — verdicts được áp dụng"
+            ),
+        }
+
     return app
 
 

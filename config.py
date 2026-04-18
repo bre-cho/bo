@@ -402,3 +402,61 @@ GAME_N_OPPONENTS          = 4
 GAME_FP_ITERATIONS        = 500
 # Minimum trade samples for platform pressure detection
 GAME_PRESSURE_MIN_SAMPLES = 20
+
+# ============================================================
+# SOVEREIGN OVERSIGHT LAYER — Strategic Network Governance
+# ============================================================
+# Bật/tắt SSOL hoàn toàn
+SSOL_ENABLED              = True
+# Shadow mode: True = chỉ khuyến nghị (log), không cưỡng chế active pool
+# False = verdicts được enforce lên Redis → DecisionEngine tuân theo
+SSOL_SHADOW_MODE          = True
+# Chạy SSOL mỗi N chu kỳ engine (0 = tắt auto-run)
+SSOL_CYCLE_INTERVAL       = 50
+# Số lệnh tối thiểu per cluster để xét kill/quarantine
+SSOL_MIN_TRADES_PER_CLUSTER = 10
+
+# Network Objective thresholds
+# Drawdown tối đa của bất kỳ cluster nào → trigger SURVIVAL phase
+SSOL_OBJECTIVE_SURVIVAL_DRAWDOWN = 0.15
+# Win rate trung bình toàn mạng >= → trigger GROWTH phase
+SSOL_OBJECTIVE_GROWTH_WIN_RATE   = 0.60
+# Profit factor trung bình >= + win rate đủ → trigger EXPANSION phase
+SSOL_OBJECTIVE_EXPANSION_PF      = 1.50
+
+# Resource allocation
+# Attention tối thiểu mỗi cluster nhận (kể cả cluster yếu)
+SSOL_ATTENTION_MIN_FRACTION   = 0.10
+# Capital fraction tối thiểu mỗi cluster nhận
+SSOL_CAPITAL_MIN_FRACTION     = 0.10
+
+# Cluster Governor thresholds
+# Win rate < ngưỡng này + CRITICAL → KILL cluster
+SSOL_KILL_WIN_RATE            = 0.35
+# Win rate < ngưỡng này + CRITICAL → QUARANTINE cluster
+SSOL_QUARANTINE_WIN_RATE      = 0.42
+# Win rate >= + PF >= → SCALE UP cluster (cần phase GROWTH/EXPANSION)
+SSOL_SCALE_UP_WIN_RATE        = 0.62
+SSOL_SCALE_UP_PF              = 1.40
+# Số chu kỳ SSOL để thử revive cluster đang quarantine
+SSOL_REVIVE_QUARANTINE_CYCLES = 20
+
+# Sovereignty Guardrails
+# Không cluster nào được nhận > 50% tổng vốn
+SSOL_MAX_CLUSTER_CAPITAL_PCT  = 0.50
+# Phải có ít nhất N cluster active tại mọi thời điểm
+SSOL_MIN_ACTIVE_CLUSTERS      = 1
+# Drawdown tối đa toàn mạng → emergency pause toàn bộ
+SSOL_MAX_NETWORK_DRAWDOWN     = 0.25
+# Ngưỡng đa dạng regime tối thiểu (0.30 = không cluster nào chiếm > 70%)
+SSOL_ANTIFRAGILE_REGIME_DIV   = 0.30
+
+# Strategic Memory
+# Số bài học tối đa lưu trong Redis (FIFO)
+SSOL_MEMORY_MAX_LESSONS       = 200
+
+# Redis keys cho SSOL
+REDIS_SSOL_REPORT_KEY         = "Deriv_SSOL_Report"
+REDIS_SSOL_VERDICTS_KEY       = "Deriv_SSOL_Verdicts"
+REDIS_SSOL_MEMORY_KEY         = "Deriv_SSOL_Memory"
+REDIS_SSOL_QUARANTINE_KEY     = "Deriv_SSOL_Quarantine"

@@ -59,6 +59,14 @@ except ImportError as _e:
     _HAS_NEW_COMPONENTS = False
     print(f"[Engine] New components not available: {_e}")
 
+# ── Sovereign Oversight Layer (lazy-loaded) ────────────────────────
+try:
+    from sovereign_oversight import SovereignOversightLayer
+    _HAS_SSOL = True
+except ImportError as _e:
+    _HAS_SSOL = False
+    print(f"[Engine] Sovereign Oversight Layer not available: {_e}")
+
 
 # ──────────────────────────────────────────────────────────────────
 # System state enum
@@ -129,6 +137,12 @@ class DecisionEngine:
             self.cap_strat = None
             self.candle_lib= None
             self.model_reg = None
+
+        # ── Sovereign Oversight Layer ─────────────────────────────
+        if _HAS_SSOL and getattr(config, "SSOL_ENABLED", True):
+            self._ssol = SovereignOversightLayer()
+        else:
+            self._ssol = None
 
         # ── Cold-start synthetic training ─────────────────────────
         if config.ML_ENABLED and config.SYNTH_COLD_START:
@@ -735,6 +749,63 @@ class DecisionEngine:
                 f"Pool ổn định ({len(current)} thị trường)"
             )
 
+    # ── ⑨ sovereign oversight ─────────────────────────────────────
+
+    def trigger_sovereign_oversight(self) -> None:
+        """
+        Chạy một chu kỳ SSOL (Strategic Sovereign Oversight Layer).
+
+        Quy trình:
+          1. Thu thập telemetry per-cluster từ Redis
+          2. Chấm điểm + xác định phase mạng
+          3. Phân bổ attention/capital budget
+          4. Kiểm tra guardrails toàn mạng
+          5. Phát lệnh governor (scale/kill/quarantine/revive)
+          6. Cập nhật strategic memory
+          7. Lưu báo cáo vào Redis
+
+        Trong shadow mode (SSOL_SHADOW_MODE=True):
+          - Tính toán đầy đủ nhưng không thay đổi active_symbols
+          - Chỉ ghi log khuyến nghị → phase 2 của lộ trình triển khai
+
+        Trong enforce mode (SSOL_SHADOW_MODE=False):
+          - Verdicts được ghi Redis → active_symbols được lọc ngay
+          - phase 3-4 của lộ trình triển khai
+        """
+        if self._ssol is None:
+            return
+
+        print(f"\n  👑 [SSOL] Chạy sovereign oversight cycle #{self._cycle_count}...")
+        try:
+            report = self._ssol.run(
+                active_symbols=list(self._active_symbols),
+                verbose=True,
+            )
+
+            # Enforce mode: cập nhật active_symbols theo verdict của SSOL
+            if not getattr(config, "SSOL_SHADOW_MODE", True):
+                allowed = self._ssol.get_allowed_symbols(self._active_symbols)
+                if allowed != self._active_symbols:
+                    removed = set(self._active_symbols) - set(allowed)
+                    added   = set(allowed) - set(self._active_symbols)
+                    self._active_symbols = allowed
+                    self._save_active_symbols()
+                    if removed:
+                        print(f"  👑 [SSOL] 🗑️  Pool cập nhật: loại {removed}")
+                    if added:
+                        print(f"  👑 [SSOL] ➕ Pool cập nhật: thêm {added}")
+
+            print(
+                f"  👑 [SSOL] Phase={report.network_phase}  "
+                f"Health={report.network_health_score:.2f}  "
+                f"Active={report.n_clusters_active}/"
+                f"{report.n_clusters_total}  "
+                f"Alerts={len(report.guardrail_alerts)}"
+            )
+
+        except Exception as exc:
+            print(f"  👑 [SSOL] Lỗi: {exc}")
+
     # ── Dashboard ─────────────────────────────────────────────────
 
     def print_dashboard(self, balance: float, mode: SystemMode) -> None:
@@ -787,6 +858,12 @@ class DecisionEngine:
                 f"W-streak={cs['consecutive_win']}  L-streak={cs['consecutive_loss']}  "
                 f"PnL={cs['cycle_pnl']:+.2f}"
             )
+        # Sovereign Oversight Layer summary
+        if self._ssol is not None:
+            ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
+            ssol_in = ssol_interval - (self._cycle_count % ssol_interval)
+            shadow  = "shadow" if getattr(config, "SSOL_SHADOW_MODE", True) else "enforce"
+            print(f"  SSOL👑   : mode={shadow}  next_in={ssol_in} cycles")
 
     # ── Master run loop ───────────────────────────────────────────
 
@@ -820,6 +897,13 @@ class DecisionEngine:
             f"  Memory Brain    : block≥{config.MEMORY_HARD_BLOCK_LOSS_RATE*100:.0f}% loss  "
             f"min_n={config.MEMORY_MIN_SAMPLES_FOR_RULE}  "
             f"rules={len(self.memory._hard_rules)}"
+        )
+        ssol_status = "enabled" if self._ssol is not None else "disabled"
+        ssol_mode   = ("shadow" if getattr(config, "SSOL_SHADOW_MODE", True) else "enforce") if self._ssol else "n/a"
+        ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
+        print(
+            f"  SSOL👑          : {ssol_status}  mode={ssol_mode}  "
+            f"interval={ssol_interval} cycles"
         )
         print("=" * 65)
 
@@ -869,6 +953,11 @@ class DecisionEngine:
                     # ⑧ tự scale (mỗi SCALE_INTERVAL_CYCLES chu kỳ)
                     if self._cycle_count % config.SCALE_INTERVAL_CYCLES == 0:
                         self.self_scale()
+
+                    # ⑨ sovereign oversight (mỗi SSOL_CYCLE_INTERVAL chu kỳ)
+                    ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
+                    if ssol_interval > 0 and self._cycle_count % ssol_interval == 0:
+                        self.trigger_sovereign_oversight()
 
                     # ④ tự hành động — qua pipeline
                     self.run_live_cycle(balance=balance)

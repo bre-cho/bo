@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-04-18T10:06:45.460129",
+  "network_phase": "REBALANCE",
+  "network_health_score": 0.5,
+  "n_clusters_total": 5,
+  "n_clusters_active": 5,
+  "n_clusters_quarantined": 0,
+  "n_clusters_dead": 0,
+  "cluster_verdicts": [
+    {
+      "cluster_id": "R_10",
+      "health": "DEGRADED",
+      "action": "KEEP",
+      "score": 0.5,
+      "confidence": 1.0,
+      "rationale": "Ch\u01b0a \u0111\u1ee7 10 l\u1ec7nh (0) \u2014 gi\u1eef nguy\u00ean",
+      "enforced": false
+    },
+    {
+      "cluster_id": "R_25",
+      "health": "DEGRADED",
+      "action": "KEEP",
+      "score": 0.5,
+      "confidence": 1.0,
+      "rationale": "Ch\u01b0a \u0111\u1ee7 10 l\u1ec7nh (0) \u2014 gi\u1eef nguy\u00ean",
+      "enforced": false
+    },
+    {
+      "cluster_id": "R_50",
+      "health": "DEGRADED",
+      "action": "KEEP",
+      "score": 0.5,
+      "confidence": 1.0,
+      "rationale": "Ch\u01b0a \u0111\u1ee7 10 l\u1ec7nh (0) \u2014 gi\u1eef nguy\u00ean",
+      "enforced": false
+    },
+    {
+      "cluster_id": "R_75",
+      "health": "DEGRADED",
+      "action": "KEEP",
+      "score": 0.5,
+      "confidence": 1.0,
+      "rationale": "Ch\u01b0a \u0111\u1ee7 10 l\u1ec7nh (0) \u2014 gi\u1eef nguy\u00ean",
+      "enforced": false
+    },
+    {
+      "cluster_id": "R_100",
+      "health": "DEGRADED",
+      "action": "KEEP",
+      "score": 0.5,
+      "confidence": 1.0,
+      "rationale": "Ch\u01b0a \u0111\u1ee7 10 l\u1ec7nh (0) \u2014 gi\u1eef nguy\u00ean",
+      "enforced": false
+    }
+  ],
+  "resource_budgets": [
+    {
+      "cluster_id": "R_10",
+      "capital_fraction": 0.2,
+      "attention_weight": 0.2,
+      "compute_priority": 2,
+      "max_concurrent": 1
+    },
+    {
+      "cluster_id": "R_25",
+      "capital_fraction": 0.2,
+      "attention_weight": 0.2,
+      "compute_priority": 2,
+      "max_concurrent": 1
+    },
+    {
+      "cluster_id": "R_50",
+      "capital_fraction": 0.2,
+      "attention_weight": 0.2,
+      "compute_priority": 2,
+      "max_concurrent": 1
+    },
+    {
+      "cluster_id": "R_75",
+      "capital_fraction": 0.2,
+      "attention_weight": 0.2,
+      "compute_priority": 2,
+      "max_concurrent": 1
+    },
+    {
+      "cluster_id": "R_100",
+      "capital_fraction": 0.2,
+      "attention_weight": 0.2,
+      "compute_priority": 2,
+      "max_concurrent": 1
+    }
+  ],
+  "guardrail_alerts": [
+    "\u26a0\ufe0f  GUARDRAIL: Ch\u1ec9 c\u00f2n 0 cluster active (t\u1ed1i thi\u1ec3u 1) \u2014 gi\u1eef \u00edt nh\u1ea5t 1 cluster"
+  ],
+  "strategic_lessons": [],
+  "insights": [
+    "Network phase: REBALANCE \u2014 Tr\u1ea1ng th\u00e1i c\u00e2n b\u1eb1ng, theo d\u00f5i li\u00ean t\u1ee5c",
+    "S\u1ee9c kh\u1ecfe m\u1ea1ng: 0/5 cluster HEALTHY (network score=0.50)",
+    "\ud83d\udcb0 Cluster nh\u1eadn budget cao nh\u1ea5t: R_10 (attention=20.0% capital=20.0%)",
+    "\u26a0\ufe0f  1 guardrail alert(s) k\u00edch ho\u1ea1t",
+    "\ud83c\udf11 Shadow mode \u2014 khuy\u1ebfn ngh\u1ecb \u0111\u00e3 ghi log, ch\u01b0a c\u01b0\u1ee1ng ch\u1ebf. \u0110\u1eb7t SSOL_SHADOW_MODE=False \u0111\u1ec3 b\u1eadt enforce."
+  ],
+  "shadow_mode": true
+}
