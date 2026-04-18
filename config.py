@@ -402,3 +402,137 @@ GAME_N_OPPONENTS          = 4
 GAME_FP_ITERATIONS        = 500
 # Minimum trade samples for platform pressure detection
 GAME_PRESSURE_MIN_SAMPLES = 20
+
+# ============================================================
+# SOVEREIGN OVERSIGHT LAYER — Strategic Network Governance
+# ============================================================
+# Bật/tắt SSOL hoàn toàn
+SSOL_ENABLED              = True
+# Shadow mode: True = chỉ khuyến nghị (log), không cưỡng chế active pool
+# False = verdicts được enforce lên Redis → DecisionEngine tuân theo
+SSOL_SHADOW_MODE          = True
+# Chạy SSOL mỗi N chu kỳ engine (0 = tắt auto-run)
+SSOL_CYCLE_INTERVAL       = 50
+# Số lệnh tối thiểu per cluster để xét kill/quarantine
+SSOL_MIN_TRADES_PER_CLUSTER = 10
+
+# Network Objective thresholds
+# Drawdown tối đa của bất kỳ cluster nào → trigger SURVIVAL phase
+SSOL_OBJECTIVE_SURVIVAL_DRAWDOWN = 0.15
+# Win rate trung bình toàn mạng >= → trigger GROWTH phase
+SSOL_OBJECTIVE_GROWTH_WIN_RATE   = 0.60
+# Profit factor trung bình >= + win rate đủ → trigger EXPANSION phase
+SSOL_OBJECTIVE_EXPANSION_PF      = 1.50
+
+# Resource allocation
+# Attention tối thiểu mỗi cluster nhận (kể cả cluster yếu)
+SSOL_ATTENTION_MIN_FRACTION   = 0.10
+# Capital fraction tối thiểu mỗi cluster nhận
+SSOL_CAPITAL_MIN_FRACTION     = 0.10
+
+# Cluster Governor thresholds
+# Win rate < ngưỡng này + CRITICAL → KILL cluster
+SSOL_KILL_WIN_RATE            = 0.35
+# Win rate < ngưỡng này + CRITICAL → QUARANTINE cluster
+SSOL_QUARANTINE_WIN_RATE      = 0.42
+# Win rate >= + PF >= → SCALE UP cluster (cần phase GROWTH/EXPANSION)
+SSOL_SCALE_UP_WIN_RATE        = 0.62
+SSOL_SCALE_UP_PF              = 1.40
+# Số chu kỳ SSOL để thử revive cluster đang quarantine
+SSOL_REVIVE_QUARANTINE_CYCLES = 20
+
+# Sovereignty Guardrails
+# Không cluster nào được nhận > 50% tổng vốn
+SSOL_MAX_CLUSTER_CAPITAL_PCT  = 0.50
+# Phải có ít nhất N cluster active tại mọi thời điểm
+SSOL_MIN_ACTIVE_CLUSTERS      = 1
+# Drawdown tối đa toàn mạng → emergency pause toàn bộ
+SSOL_MAX_NETWORK_DRAWDOWN     = 0.25
+# Ngưỡng đa dạng regime tối thiểu (0.30 = không cluster nào chiếm > 70%)
+SSOL_ANTIFRAGILE_REGIME_DIV   = 0.30
+
+# Strategic Memory
+# Số bài học tối đa lưu trong Redis (FIFO)
+SSOL_MEMORY_MAX_LESSONS       = 200
+
+# Redis keys cho SSOL
+REDIS_SSOL_REPORT_KEY         = "Deriv_SSOL_Report"
+REDIS_SSOL_VERDICTS_KEY       = "Deriv_SSOL_Verdicts"
+REDIS_SSOL_MEMORY_KEY         = "Deriv_SSOL_Memory"
+REDIS_SSOL_QUARANTINE_KEY     = "Deriv_SSOL_Quarantine"
+
+# ============================================================
+# EMPIRE CONTROL LAYER — Strategic Sovereign Control (SSCL)
+# ============================================================
+# Bật/tắt SSCL (Strategic Sovereign Control Layer)
+EMPIRE_ENABLED                 = True
+# Chạy SSCL mỗi N chu kỳ engine (0 = tắt auto-run)
+EMPIRE_CYCLE_INTERVAL          = 100
+
+# DominanceTracker: win rate lý thuyết tối đa trong điều kiện thị trường
+EMPIRE_THEORETICAL_MAX_WIN_RATE = 0.75
+
+# AttentionPortfolio
+# Risk-free win rate baseline cho Sharpe calculation
+EMPIRE_RISK_FREE_WIN_RATE       = 0.50
+# Minimum attention fraction mỗi cluster nhận trong portfolio
+EMPIRE_MIN_ATTENTION_FRACTION   = 0.05
+# Temperature parameter điều chỉnh độ tập trung của softmax allocation
+# Cao → phân bổ đều hơn; Thấp → winner-take-all
+EMPIRE_PORTFOLIO_TEMPERATURE    = 2.0
+
+# MergeAdvisor
+# Ngưỡng synergy tối thiểu để đề xuất merge
+EMPIRE_MERGE_MIN_SYNERGY        = 0.05
+
+# Redis keys cho SSCL
+REDIS_EMPIRE_REPORT_KEY         = "Deriv_Empire_Report"
+REDIS_EMPIRE_HISTORY_KEY        = "Deriv_Empire_History"
+
+# ============================================================
+# AUTONOMOUS EVOLUTION ENGINE (AEE)
+# ============================================================
+# Bật/tắt AEE hoàn toàn
+AEE_ENABLED                     = True
+# Dry-run: True = detect + evaluate nhưng KHÔNG apply
+#          False = apply mutations đã pass gate (phase 3)
+AEE_DRY_RUN                     = True
+# Chạy AEE mỗi N chu kỳ engine (0 = tắt auto-run)
+AEE_CYCLE_INTERVAL              = 200
+
+# WeaknessDetector thresholds
+# Win rate dưới ngưỡng này → weakness LOW_WIN_RATE
+AEE_WR_WEAKNESS_THRESHOLD       = 0.52
+# Max drawdown vượt ngưỡng này → weakness HIGH_DRAWDOWN
+AEE_DD_WEAKNESS_THRESHOLD       = 0.15
+# Pipeline rejection rate vượt ngưỡng này → weakness HIGH_REJECTION_RATE
+AEE_REJECT_WEAKNESS_THRESHOLD   = 0.60
+# Số chu kỳ không cập nhật genome → weakness STALE_GENOME
+AEE_STALE_GENOME_CYCLES         = 100
+# Số lệnh tối thiểu để phân tích điểm yếu
+AEE_MIN_TRADES_FOR_ANALYSIS     = 20
+# Số lần thua liên tiếp → weakness CONSECUTIVE_LOSS
+AEE_CONSEC_LOSS_THRESHOLD       = 5
+
+# MutationEvaluator
+# Số synthetic environments để đánh giá mỗi mutation
+AEE_N_EVAL_ENVS                 = 4
+
+# SafeEvolutionGate thresholds
+# Win rate phải cải thiện ít nhất % này để pass
+AEE_MIN_WIN_RATE_IMPROVEMENT    = 0.005
+# Profit factor phải cải thiện ít nhất X để pass (OR với WR)
+AEE_MIN_PF_IMPROVEMENT          = 0.05
+# Drawdown không được tăng quá % này
+AEE_MAX_DD_INCREASE             = 0.05
+# Confidence tối thiểu (dựa trên n_trades evaluated)
+AEE_MIN_CONFIDENCE              = 0.20
+
+# EvolutionMemory
+# Số mutation history entries tối đa lưu trong Redis
+AEE_MEMORY_MAX_ENTRIES          = 500
+
+# Redis keys cho AEE
+REDIS_AEE_REPORT_KEY            = "Deriv_AEE_Report"
+REDIS_AEE_MEMORY_KEY            = "Deriv_AEE_Memory"
+REDIS_AEE_APPLIED_KEY           = "Deriv_AEE_Applied"
