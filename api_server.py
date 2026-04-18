@@ -628,6 +628,116 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
+    # ── Utility Engine (Decision Theory + Utility Optimization) ────
+
+    @app.get("/utility/report")
+    async def utility_report():
+        """
+        Return latest utility optimization report:
+          optimal genome, Kelly stake, Pareto front, utility breakdown, insights.
+        """
+        try:
+            from utility_engine import get_utility_report
+            return get_utility_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class UtilityOptimizeRequest(BaseModel):
+        preset        : str   = config.UTILITY_DEFAULT_PRESET
+        growth        : float = 0.35
+        trust         : float = 0.30
+        speed         : float = 0.20
+        stability     : float = 0.15
+        current_regime: str   = ""
+
+    @app.post("/utility/optimize")
+    async def utility_optimize(req: UtilityOptimizeRequest):
+        """
+        Run utility optimization with user-defined trade-off weights.
+        preset overrides individual weights if not "custom".
+        """
+        try:
+            from utility_engine import (
+                run_utility_optimization, UtilityWeights, UtilityEngine
+            )
+            if req.preset and req.preset != "custom":
+                weights = UtilityWeights.preset(req.preset)
+            else:
+                weights = UtilityWeights(
+                    growth    = req.growth,
+                    trust     = req.trust,
+                    speed     = req.speed,
+                    stability = req.stability,
+                ).normalize()
+
+            regime = req.current_regime or None
+            engine = UtilityEngine(weights=weights)
+            report = engine.run(current_regime=regime, verbose=False)
+            return {
+                "status"           : "ok",
+                "optimal_genome_id": report.optimal_genome_id,
+                "kelly_stake"      : report.kelly_stake,
+                "pareto_front_size": report.pareto_front_size,
+                "n_evaluated"      : report.n_evaluated,
+                "utility_breakdown": report.utility_breakdown,
+                "temporal_analysis": report.temporal_analysis,
+                "pareto_front"     : report.pareto_front[:8],
+                "insights"         : report.insights,
+                "weights"          : report.weights,
+                "top_scores"       : [
+                    {
+                        "genome_id"       : s["genome_id"],
+                        "growth_utility"  : s["growth_utility"],
+                        "trust_utility"   : s["trust_utility"],
+                        "speed_utility"   : s["speed_utility"],
+                        "stability_utility": s["stability_utility"],
+                        "weighted_utility": s["weighted_utility"],
+                        "kelly_fraction"  : s["kelly_fraction"],
+                        "pareto_rank"     : s["pareto_rank"],
+                        "is_pareto_optimal": s["is_pareto_optimal"],
+                        "win_rate_pct"    : s["win_rate_pct"],
+                    }
+                    for s in report.scores[:10]
+                ],
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/utility/pareto")
+    async def utility_pareto():
+        """
+        Run Pareto analysis across all weight presets.
+        Returns how optimal genome changes under different preferences.
+        """
+        try:
+            from utility_engine import UtilityEngine
+            engine  = UtilityEngine()
+            results = engine.pareto_analysis()
+            return {"status": "ok", "pareto_by_preset": results}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/utility/kelly")
+    async def utility_kelly(win_rate: float = 55.0):
+        """
+        Return Kelly fraction and growth curve for a given win rate.
+        """
+        try:
+            from utility_engine import KellyOptimizer
+            kelly = KellyOptimizer()
+            kf, kf_frac, gr = kelly.compute(win_rate)
+            return {
+                "status"            : "ok",
+                "win_rate_pct"      : win_rate,
+                "kelly_full"        : kf,
+                "kelly_fractional"  : kf_frac,
+                "growth_rate"       : gr,
+                "breakeven_winrate" : kelly.breakeven_winrate(),
+                "curve"             : kelly.growth_curve(win_rate),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return app
 
 

@@ -540,6 +540,347 @@ function renderEvolutionHistory(history) {
     </tr>`).join('');
 }
 
+// ── Utility AI Engine ────────────────────────────────────────────
+
+const UTILITY_PRESETS = {
+  balanced   : [35, 30, 20, 15],
+  aggressive : [60, 10, 20, 10],
+  conservative:[20, 50, 10, 20],
+  speed      : [20, 10, 60, 10],
+  stable     : [20, 30, 10, 40],
+};
+
+function applyUtilityPreset() {
+  const preset = document.getElementById('utility-preset').value;
+  if (preset === 'custom' || !UTILITY_PRESETS[preset]) return;
+  const [g, t, sp, st] = UTILITY_PRESETS[preset];
+  document.getElementById('slider-growth').value    = g;
+  document.getElementById('slider-trust').value     = t;
+  document.getElementById('slider-speed').value     = sp;
+  document.getElementById('slider-stability').value = st;
+  onUtilitySlider();
+}
+
+function onUtilitySlider() {
+  const g  = parseInt(document.getElementById('slider-growth').value);
+  const t  = parseInt(document.getElementById('slider-trust').value);
+  const sp = parseInt(document.getElementById('slider-speed').value);
+  const st = parseInt(document.getElementById('slider-stability').value);
+  const total = g + t + sp + st;
+
+  document.getElementById('val-growth').textContent    = `${g}%`;
+  document.getElementById('val-trust').textContent     = `${t}%`;
+  document.getElementById('val-speed').textContent     = `${sp}%`;
+  document.getElementById('val-stability').textContent = `${st}%`;
+
+  const sumEl = document.getElementById('utility-weights-sum');
+  if (total === 0) {
+    sumEl.textContent = '⚠️ Tổng = 0';
+    sumEl.className = 'text-danger small text-center mt-1';
+  } else {
+    sumEl.textContent = `Tổng: ${total} → normalized ×${(100/total).toFixed(2)}`;
+    sumEl.className = 'text-muted small text-center mt-1';
+  }
+
+  // Switch preset to "custom" when user drags manually
+  const presetEl = document.getElementById('utility-preset');
+  if (presetEl) {
+    const presetVals = UTILITY_PRESETS[presetEl.value];
+    if (!presetVals || presetVals[0] !== g || presetVals[1] !== t ||
+        presetVals[2] !== sp || presetVals[3] !== st) {
+      presetEl.value = 'custom';
+    }
+  }
+}
+
+async function runUtilityOptimize() {
+  const preset = document.getElementById('utility-preset').value;
+  const regime = document.getElementById('utility-regime').value;
+  const btn    = document.getElementById('utility-run-btn');
+  const prog   = document.getElementById('utility-progress');
+
+  btn.disabled       = true;
+  prog.style.display = '';
+
+  const g  = parseInt(document.getElementById('slider-growth').value)    / 100;
+  const t  = parseInt(document.getElementById('slider-trust').value)     / 100;
+  const sp = parseInt(document.getElementById('slider-speed').value)     / 100;
+  const st = parseInt(document.getElementById('slider-stability').value) / 100;
+
+  const body = {
+    preset         : preset === 'custom' ? 'custom' : preset,
+    growth         : g,
+    trust          : t,
+    speed          : sp,
+    stability      : st,
+    current_regime : regime || '',
+  };
+
+  const result = await apiPost('/utility/optimize', body);
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  if (result && result.status === 'ok') {
+    renderUtilityOptimal(result);
+    renderUtilityScores(result.top_scores || []);
+    renderUtilityTemporal(result.temporal_analysis || {});
+    renderUtilityCausal(result.causal_alignment || {});
+    renderUtilityInsights(result.insights || []);
+    renderUtilityKelly(result.utility_breakdown, result.top_scores);
+    document.getElementById('utility-scores-card').style.display   = '';
+    document.getElementById('utility-kelly-card').style.display    = '';
+    document.getElementById('utility-temporal-card').style.display = '';
+    document.getElementById('utility-causal-card').style.display   = '';
+    showToast(
+      `Utility: optimal=${result.optimal_genome_id}  Kelly=${(result.kelly_stake*100).toFixed(1)}%`,
+      'info'
+    );
+    await loadParetoAnalysis();
+  } else {
+    showToast('Utility optimization thất bại — chạy Evolution + Meta trước', 'warning');
+  }
+}
+
+async function loadUtilityReport() {
+  const result = await apiGet('/utility/report');
+  if (!result || result.status === 'no_report') return;
+
+  renderUtilityOptimal(result);
+  renderUtilityScores((result.scores || []).slice(0, 10));
+  renderUtilityTemporal(result.temporal_analysis || {});
+  renderUtilityCausal(result.causal_alignment   || {});
+  renderUtilityInsights(result.insights || []);
+  renderUtilityKelly(result.utility_breakdown, result.scores);
+
+  document.getElementById('utility-scores-card').style.display   = '';
+  document.getElementById('utility-kelly-card').style.display    = '';
+  document.getElementById('utility-temporal-card').style.display = '';
+  document.getElementById('utility-causal-card').style.display   = '';
+
+  await loadParetoAnalysis();
+}
+
+async function loadParetoAnalysis() {
+  const result = await apiGet('/utility/pareto');
+  if (result && result.status === 'ok') {
+    renderParetoAnalysis(result.pareto_by_preset || {});
+  }
+}
+
+function renderUtilityOptimal(result) {
+  const card = document.getElementById('utility-optimal-card');
+  const body = document.getElementById('utility-optimal-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  const gid    = result.optimal_genome_id || '?';
+  const kelly  = (result.kelly_stake || 0) * 100;
+  const front  = result.pareto_front_size || 0;
+  const n_eval = result.n_evaluated || 0;
+  const bd     = result.utility_breakdown || {};
+  const w      = result.weights || {};
+
+  const barHtml = (label, val, color) => `
+    <div class="mb-1">
+      <div class="d-flex justify-content-between small">
+        <span class="${color}">${label}</span>
+        <span class="${color}">${(val*100).toFixed(1)}%</span>
+      </div>
+      <div class="progress bg-dark" style="height:6px">
+        <div class="progress-bar ${color.replace('text-','bg-')}" style="width:${Math.round(val*100)}%"></div>
+      </div>
+    </div>`;
+
+  body.innerHTML = `
+    <div class="d-flex justify-content-between mb-2">
+      <div>
+        <div class="text-info fw-bold">${gid}</div>
+        <div class="text-muted small">
+          Pareto front: <strong class="text-success">${front}</strong> genomes
+          &nbsp;|&nbsp; Pool: ${n_eval} evaluated
+        </div>
+      </div>
+      <div class="text-center">
+        <div class="fs-5 text-warning fw-bold">${kelly.toFixed(1)}%</div>
+        <div class="text-muted small">Kelly stake</div>
+      </div>
+    </div>
+    ${barHtml('📈 Growth',    bd.growth    || 0, 'text-warning')}
+    ${barHtml('🛡️ Trust',    bd.trust     || 0, 'text-success')}
+    ${barHtml('⚡ Speed',     bd.speed     || 0, 'text-info')}
+    ${barHtml('🏔️ Stability',bd.stability || 0, 'text-secondary')}
+    <div class="mt-2 text-center small text-muted">
+      Weighted score: <strong class="text-light">${((bd.weighted||0)*100).toFixed(2)}%</strong>
+      &nbsp;|&nbsp; Weights: g=${(w.growth||0)*100|0}% t=${(w.trust||0)*100|0}%
+      sp=${(w.speed||0)*100|0}% st=${(w.stability||0)*100|0}%
+    </div>`;
+}
+
+function renderUtilityScores(scores) {
+  const tbody = document.querySelector('#utility-scores-table tbody');
+  if (!tbody) return;
+
+  const bar = (v) => {
+    const pct = Math.round((v || 0) * 100);
+    const col = pct > 66 ? 'bg-success' : pct > 33 ? 'bg-warning' : 'bg-danger';
+    return `<div class="progress bg-dark" style="height:4px;width:40px;display:inline-block;vertical-align:middle">
+      <div class="progress-bar ${col}" style="width:${pct}%"></div></div>`;
+  };
+
+  tbody.innerHTML = (scores || []).map(s => {
+    const star = s.is_pareto_optimal
+      ? '<span class="text-info" title="Pareto optimal">★</span> '
+      : '';
+    return `
+      <tr>
+        <td class="small">${star}${s.genome_id}</td>
+        <td>${bar(s.growth_utility)}</td>
+        <td>${bar(s.trust_utility)}</td>
+        <td>${bar(s.speed_utility)}</td>
+        <td>${bar(s.stability_utility)}</td>
+        <td class="small text-info fw-bold">${((s.weighted_utility||0)*100).toFixed(1)}</td>
+        <td class="small text-warning">${((s.kelly_fraction||0)*100).toFixed(1)}%</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderUtilityTemporal(ta) {
+  const body = document.getElementById('utility-temporal-body');
+  if (!body || !ta || !Object.keys(ta).length) return;
+
+  const bar = (label, v, color) => `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between small">
+        <span class="${color}">${label}</span>
+        <span class="${color}">${((v||0)*100).toFixed(1)}%</span>
+      </div>
+      <div class="progress bg-dark" style="height:8px">
+        <div class="progress-bar ${color.replace('text-','bg-')}"
+             style="width:${Math.round((v||0)*100)}%"></div>
+      </div>
+    </div>`;
+
+  body.innerHTML = `
+    ${bar('⚡ Short-term  (H=5 trades)',  ta.short_term_utility,  'text-warning')}
+    ${bar('⚖️ Medium-term (H=20 trades)', ta.medium_term_utility, 'text-info')}
+    ${bar('🔭 Long-term   (H=50 trades)', ta.long_term_utility,   'text-success')}
+    ${bar('🎯 Temporal composite',         ta.temporal_utility,    'text-light')}
+    <div class="text-muted small mt-2">
+      ${ta.preference_type || ''} (λ=${ta.discount_rate || 0.2})
+    </div>`;
+}
+
+function renderUtilityCausal(alignment) {
+  const body = document.getElementById('utility-causal-body');
+  if (!body || !alignment || !Object.keys(alignment).length) {
+    if (body) body.innerHTML = '<div class="text-muted">Cần chạy Causal Analysis trước</div>';
+    return;
+  }
+
+  const axisColors = {growth:'text-warning', trust:'text-success', speed:'text-info', stability:'text-muted'};
+  const qualityBadge = (q) => ({
+    good   : '<span class="badge bg-success bg-opacity-25 text-success">✅ Good</span>',
+    partial: '<span class="badge bg-warning bg-opacity-25 text-warning">⚠️ Partial</span>',
+    unknown: '<span class="badge bg-secondary bg-opacity-25 text-secondary">? Unknown</span>',
+  }[q] || '');
+
+  body.innerHTML = Object.entries(alignment).map(([axis, data]) => `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between">
+        <span class="${axisColors[axis] || 'text-muted'}">${axis}</span>
+        ${qualityBadge(data.alignment_quality)}
+      </div>
+      ${data.causal_drivers?.length ? `<div class="text-success" style="font-size:0.7rem">Causal: ${data.causal_drivers.join(', ')}</div>` : ''}
+      ${data.spurious_present?.length ? `<div class="text-danger" style="font-size:0.7rem">Spurious: ${data.spurious_present.join(', ')}</div>` : ''}
+    </div>`
+  ).join('');
+}
+
+function renderUtilityInsights(insights) {
+  const card = document.getElementById('utility-insights-card');
+  const body = document.getElementById('utility-insights-body');
+  if (!card || !body || !insights.length) return;
+  card.style.display = '';
+  body.innerHTML = insights.map(i =>
+    `<div class="d-flex gap-2 mb-1 small">
+       <span class="text-info flex-shrink-0">•</span>
+       <span class="text-muted">${i}</span>
+     </div>`
+  ).join('');
+}
+
+function renderUtilityKelly(breakdown, scores) {
+  const body = document.getElementById('utility-kelly-body');
+  if (!body) return;
+
+  // Find the best genome's win_rate for Kelly curve display
+  const best = (scores || [])[0];
+  if (!best) {
+    body.innerHTML = '<div class="text-muted small">No data</div>';
+    return;
+  }
+  const wr      = best.win_rate_pct || 55;
+  const kelly   = best.kelly_fraction || 0;
+  const breakev = 54.0;  // approx for 85% payout
+
+  body.innerHTML = `
+    <div class="row text-center mb-2 g-1">
+      <div class="col">
+        <div class="fw-bold text-warning">${wr.toFixed(1)}%</div>
+        <div class="text-muted" style="font-size:0.72rem">Win Rate</div>
+      </div>
+      <div class="col">
+        <div class="fw-bold text-success">${(kelly*100).toFixed(1)}%</div>
+        <div class="text-muted" style="font-size:0.72rem">Kelly Stake</div>
+      </div>
+      <div class="col">
+        <div class="fw-bold text-info">${breakev.toFixed(1)}%</div>
+        <div class="text-muted" style="font-size:0.72rem">Breakeven WR</div>
+      </div>
+    </div>
+    <div class="text-muted small">
+      <strong>f* = (p·b−q)/b</strong> &nbsp;|&nbsp;
+      p=${(wr/100).toFixed(3)} b=0.85 &nbsp;→&nbsp;
+      full Kelly = ${((wr/100*0.85-(1-wr/100))/0.85*100).toFixed(1)}%
+      &nbsp;→&nbsp; quarter = ${(kelly*100).toFixed(1)}%
+    </div>
+    <div class="text-muted small mt-1">
+      Quarter-Kelly bảo vệ tránh ruin trong chuỗi thua liên tiếp.
+    </div>`;
+}
+
+function renderParetoAnalysis(byPreset) {
+  const card = document.getElementById('utility-pareto-card');
+  const body = document.getElementById('utility-pareto-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  const presetEmojis = {
+    balanced:'⚖️', aggressive:'🚀', conservative:'🛡️', speed:'⚡', stable:'🏔️'
+  };
+
+  body.innerHTML = Object.entries(byPreset).map(([preset, res]) => `
+    <div class="d-flex justify-content-between align-items-center mb-2 small">
+      <div>
+        <span class="text-muted">${presetEmojis[preset]||'?'} ${preset}</span>
+        <div class="text-info" style="font-size:0.7rem">
+          g=${((res.growth||0)*100).toFixed(0)}
+          t=${((res.trust||0)*100).toFixed(0)}
+          sp=${((res.speed||0)*100).toFixed(0)}
+          st=${((res.stability||0)*100).toFixed(0)}
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-light">${res.optimal_genome_id || '?'}</div>
+        <div class="text-muted" style="font-size:0.7rem">
+          score=${((res.weighted_utility||0)*100).toFixed(1)}%
+          kelly=${((res.kelly_fraction||0)*100).toFixed(1)}%
+        </div>
+      </div>
+    </div>`
+  ).join('') || '<div class="text-muted small">Chưa có dữ liệu</div>';
+}
+
 // ── Causal AI Engine ─────────────────────────────────────────────
 
 async function runCausalAnalyze() {
@@ -999,5 +1340,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load causal report when causal tab is clicked
   document.querySelectorAll('[href="#tab-causal"]').forEach(el => {
     el.addEventListener('click', () => loadCausalReport());
+  });
+
+  // Load utility report when utility tab is clicked
+  document.querySelectorAll('[href="#tab-utility"]').forEach(el => {
+    el.addEventListener('click', () => loadUtilityReport());
   });
 });

@@ -368,3 +368,17 @@ CAUSAL_REGIME_ENVS       = 1
 CAUSAL_TOP_K_GENOMES     = 12
 # Fitness threshold để coi 1 genome là "sống sót" trong một regime
 CAUSAL_FIT_THRESHOLD     = 0.01
+
+# ============================================================
+# UTILITY ENGINE — Decision Theory + Utility Optimization
+# ============================================================
+# Fractional Kelly multiplier (0.25 = quarter-Kelly: safer, ~55% max growth)
+UTILITY_KELLY_FRACTION   = 0.25
+# Hard cap on Kelly stake (never bet more than this fraction of bankroll)
+UTILITY_MAX_KELLY        = 0.20
+# Temporal discount rate λ (0 = no discounting; 0.2 = moderate near-term preference)
+UTILITY_DISCOUNT_RATE    = 0.20
+# Default utility weight preset ("balanced" / "aggressive" / "conservative" / "speed" / "stable")
+UTILITY_DEFAULT_PRESET   = "balanced"
+# Minimum pool size before utility optimization runs
+UTILITY_MIN_POOL_SIZE    = 8
