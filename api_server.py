@@ -526,6 +526,108 @@ def create_app():
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
+    # ── Causal Engine (World Model + Causal Strategic Intelligence) ─
+
+    @app.get("/causal/report")
+    async def causal_report():
+        """
+        Return latest causal analysis report:
+          causal vs spurious genes, regime fitness maps,
+          world model transition matrix, counterfactuals, insights.
+        """
+        try:
+            from causal_engine import get_causal_report
+            return get_causal_report()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    class CausalAnalyzeRequest(BaseModel):
+        fast_mode: bool = True
+
+    @app.post("/causal/analyze")
+    async def causal_analyze(req: CausalAnalyzeRequest):
+        """
+        Run full causal analysis on current gene pool.
+        fast_mode=True: partial correlation proxy (fast).
+        fast_mode=False: full do-calculus intervention (accurate, slower).
+        """
+        try:
+            from causal_engine import run_causal_analysis, CausalEngine
+            config.CAUSAL_FAST_MODE = req.fast_mode
+            engine = CausalEngine()
+            report = engine.run(verbose=False)
+            return {
+                "status"        : "ok",
+                "pool_size"     : report.pool_size,
+                "causal_genes"  : report.causal_genes,
+                "spurious_genes": report.spurious_genes,
+                "neutral_genes" : report.neutral_genes,
+                "n_regimes"     : len(report.regime_fitness),
+                "insights"      : report.insights,
+                "top_effects"   : [
+                    {
+                        "gene"          : e["gene"],
+                        "causal_ace"    : e["causal_ace"],
+                        "spurious_score": e["spurious_score"],
+                        "is_causal"     : e["is_causal"],
+                        "is_spurious"   : e["is_spurious"],
+                        "optimal_range" : e["optimal_range"],
+                        "regime_stable" : e["regime_stable"],
+                    }
+                    for e in report.effects[:8]
+                ],
+                "counterfactuals": report.counterfactuals[:5],
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/causal/counterfactual")
+    async def causal_counterfactual(
+        regime_from: str = "trend_up",
+        regime_to  : str = "choppy",
+    ):
+        """
+        Counterfactual query: if market switches from regime_from to regime_to,
+        which genomes survive?
+        """
+        try:
+            from causal_engine import get_causal_report
+            report = get_causal_report()
+            if "status" in report:
+                return {"status": "no_data"}
+            # Return precomputed counterfactuals filtered by regime pair
+            cf_all = report.get("counterfactuals", [])
+            cf_filtered = [
+                cf for cf in cf_all
+                if cf.get("regime_from") == regime_from
+                   and cf.get("regime_to") == regime_to
+            ] or cf_all  # fallback to all
+            return {
+                "status"          : "ok",
+                "regime_from"     : regime_from,
+                "regime_to"       : regime_to,
+                "counterfactuals" : cf_filtered,
+                "n_survived"      : sum(1 for cf in cf_filtered if cf.get("survived")),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/causal/world_model")
+    async def causal_world_model():
+        """Return regime transition probability matrix from world model."""
+        try:
+            from causal_engine import get_causal_report
+            report = get_causal_report()
+            if "status" in report:
+                return {"status": "no_data"}
+            return {
+                "status"          : "ok",
+                "world_model"     : report.get("world_model", {}),
+                "regime_fitness"  : report.get("regime_fitness", [])[:8],
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
     return app
 
 

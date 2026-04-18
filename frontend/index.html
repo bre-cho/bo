@@ -33,6 +33,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Synthetic Engine</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evolution">🧬 Evolution</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-meta">🔬 Meta-Genetics</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-causal">⚗️ Causal AI</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
@@ -679,6 +680,177 @@
         <div class="card card-dark mt-3" id="meta-pool-card" style="display:none">
           <div class="card-header text-muted small">🗄️ Gene Pool Stats</div>
           <div class="card-body" id="meta-pool-body"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =================== CAUSAL AI =================== -->
+  <div class="tab-pane fade" id="tab-causal">
+    <div class="row g-3">
+
+      <!-- Left: controls + insights -->
+      <div class="col-md-3">
+        <div class="card card-dark">
+          <div class="card-header">⚗️ Causal AI Analysis</div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Học gene nào <em>thật sự gây ra</em> thắng lợi vs chỉ là
+              tương quan giả. Dự báo chiến lược nào sống sót khi thị trường đổi.
+            </p>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="causal-fast-mode" checked>
+                <label class="form-check-label text-muted small" for="causal-fast-mode">
+                  Fast mode (partial correlation proxy)
+                </label>
+              </div>
+              <div class="text-muted" style="font-size:0.72rem;margin-top:4px">
+                Tắt = full do-calculus interventions (chính xác hơn, chậm hơn)
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-warning flex-grow-1" onclick="runCausalAnalyze()" id="causal-run-btn">
+                <i class="bi bi-diagram-3"></i> Phân tích Nhân Quả
+              </button>
+              <button class="btn btn-outline-secondary" onclick="loadCausalReport()">
+                <i class="bi bi-arrow-repeat"></i>
+              </button>
+            </div>
+            <div id="causal-progress" class="mt-2" style="display:none">
+              <div class="progress bg-dark">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning"
+                     style="width: 100%"></div>
+              </div>
+              <div class="text-muted small mt-1 text-center" id="causal-progress-label">
+                Phân tích nhân quả…
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="card card-dark mt-3" id="causal-insights-card" style="display:none">
+          <div class="card-header text-muted small">💡 Causal Insights</div>
+          <div class="card-body p-2" id="causal-insights-body"></div>
+        </div>
+
+        <!-- Methodology legend -->
+        <div class="card card-dark mt-3">
+          <div class="card-header text-muted small">Phương pháp</div>
+          <div class="card-body p-2 small text-muted">
+            <div class="mb-1"><span class="text-warning">ACE</span> — Average Causal Effect: E[fitness|do(G=high)] − E[fitness|do(G=low)]</div>
+            <div class="mb-1"><span class="text-danger">Spurious</span> — |ρ_simple| >> |ρ_partial|: correlation giả do confounding</div>
+            <div class="mb-1"><span class="text-success">Causal</span> — |ACE| > threshold: gene thực sự điều khiển fitness</div>
+            <div class="mb-1"><span class="text-info">Robust</span> — Genome sống sót ≥70% regimes</div>
+            <div><span class="text-primary">WorldModel</span> — Xác suất chuyển regime: P(r_t+1|r_t)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle: Causal vs Spurious table + Counterfactuals -->
+      <div class="col-md-5">
+        <div class="card card-dark" id="causal-effects-card" style="display:none">
+          <div class="card-header d-flex justify-content-between">
+            <span class="small text-muted">🔍 Gene: Causal vs Spurious</span>
+            <div class="d-flex gap-1 small">
+              <span class="badge bg-success bg-opacity-25 text-success">Causal</span>
+              <span class="badge bg-danger bg-opacity-25 text-danger">Spurious</span>
+              <span class="badge bg-secondary bg-opacity-25 text-secondary">Neutral</span>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+              <table class="table table-dark table-sm mb-0" id="causal-effects-table">
+                <thead class="sticky-top bg-dark">
+                  <tr>
+                    <th>Gene</th>
+                    <th title="Average Causal Effect">ACE</th>
+                    <th title="Simple Spearman ρ">ρ</th>
+                    <th title="Partial ρ (controlling others)">partial ρ</th>
+                    <th title="Spurious score">Spur</th>
+                    <th>Optimal</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Counterfactual explorer -->
+        <div class="card card-dark mt-3" id="causal-cf-card" style="display:none">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small text-muted">🔮 Counterfactual: Nếu thị trường đổi…</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="d-flex gap-2 mb-3 align-items-center">
+              <select id="cf-regime-from" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width:140px">
+                <option value="trend_up">📈 Trend Up</option>
+                <option value="trend_down">📉 Trend Down</option>
+                <option value="choppy">↔ Choppy</option>
+                <option value="high_vol_choppy">🌊 HV Choppy</option>
+                <option value="crash">💥 Crash</option>
+                <option value="spike">🚀 Spike</option>
+                <option value="recovery">🔄 Recovery</option>
+              </select>
+              <span class="text-muted">→</span>
+              <select id="cf-regime-to" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width:140px">
+                <option value="choppy">↔ Choppy</option>
+                <option value="trend_up">📈 Trend Up</option>
+                <option value="trend_down">📉 Trend Down</option>
+                <option value="high_vol_choppy">🌊 HV Choppy</option>
+                <option value="crash">💥 Crash</option>
+                <option value="spike">🚀 Spike</option>
+                <option value="recovery">🔄 Recovery</option>
+              </select>
+              <button class="btn btn-sm btn-outline-info" onclick="queryCausalCounterfactual()">
+                <i class="bi bi-question-circle"></i>
+              </button>
+            </div>
+            <div id="causal-cf-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Regime Fitness Heatmap + World Model -->
+      <div class="col-md-4">
+        <div class="card card-dark" id="causal-regime-card" style="display:none">
+          <div class="card-header text-muted small">🌐 Regime Fitness Map</div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+              <table class="table table-dark table-sm mb-0" id="causal-regime-table">
+                <thead class="sticky-top bg-dark">
+                  <tr>
+                    <th>Genome</th>
+                    <th title="robust_score = mean/std">Robust</th>
+                    <th title="% regimes survived">Surv%</th>
+                    <th title="Best regime">Champion</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- World Model: regime transition -->
+        <div class="card card-dark mt-3" id="causal-wm-card" style="display:none">
+          <div class="card-header text-muted small">🗺️ World Model — Regime Transitions</div>
+          <div class="card-body p-2" id="causal-wm-body">
+            <div class="text-muted small">
+              P(next_regime | current_regime) — xác suất chuyển đổi chế độ thị trường
+            </div>
+          </div>
+        </div>
+
+        <!-- Pool stats + gene classification summary -->
+        <div class="card card-dark mt-3" id="causal-summary-card" style="display:none">
+          <div class="card-header text-muted small">📊 Gene Classification Summary</div>
+          <div class="card-body" id="causal-summary-body"></div>
         </div>
       </div>
 

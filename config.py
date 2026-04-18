@@ -345,3 +345,26 @@ META_TOP_K_WINNERS       = 30
 META_N_ARCHETYPES        = 4
 # Số seeds meta-guided sinh ra cho evolution tiếp theo
 META_N_SEEDS             = 12
+
+# ============================================================
+# CAUSAL ENGINE — World Model + Causal Strategy Intelligence
+# ============================================================
+# Fast mode: dùng partial correlation proxy thay vì full intervention simulation
+# False = chạy actual do-calculus interventions (chậm hơn, chính xác hơn)
+CAUSAL_FAST_MODE         = True
+# Số genomes dùng làm "probe" trong intervention simulation
+CAUSAL_N_PROBE_GENOMES   = 6
+# Số môi trường dùng để tính ACE (nhiều hơn = ít variance hơn)
+CAUSAL_N_ENVS            = 5
+# Số nến mỗi môi trường trong causal evaluation
+CAUSAL_ENV_CANDLES       = 150
+# Ngưỡng ACE để coi 1 gene là "causal" (can thiệp tạo ra sự thay đổi)
+CAUSAL_ACE_THRESHOLD     = 0.002
+# Ngưỡng spurious score để coi 1 gene là "spurious correlation"
+CAUSAL_SPURIOUS_THRESHOLD = 0.15
+# Số môi trường per regime cho world model
+CAUSAL_REGIME_ENVS       = 1
+# Số genome top để build regime fitness map
+CAUSAL_TOP_K_GENOMES     = 12
+# Fitness threshold để coi 1 genome là "sống sót" trong một regime
+CAUSAL_FIT_THRESHOLD     = 0.01

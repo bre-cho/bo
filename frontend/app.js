@@ -540,6 +540,247 @@ function renderEvolutionHistory(history) {
     </tr>`).join('');
 }
 
+// ── Causal AI Engine ─────────────────────────────────────────────
+
+async function runCausalAnalyze() {
+  const fastMode = document.getElementById('causal-fast-mode').checked;
+  const btn      = document.getElementById('causal-run-btn');
+  const prog     = document.getElementById('causal-progress');
+  const label    = document.getElementById('causal-progress-label');
+
+  btn.disabled       = true;
+  prog.style.display = '';
+  label.textContent  = fastMode
+    ? 'Phân tích partial correlation…'
+    : 'Chạy do-calculus interventions (có thể mất 30-60s)…';
+
+  const result = await apiPost('/causal/analyze', { fast_mode: fastMode });
+
+  prog.style.display = 'none';
+  btn.disabled = false;
+
+  if (result && result.status === 'ok') {
+    renderCausalInsights(result.insights);
+    renderCausalEffects(result.top_effects);
+    renderCausalSummary({
+      pool_size    : result.pool_size,
+      causal_genes : result.causal_genes,
+      spurious_genes: result.spurious_genes,
+      neutral_genes : result.neutral_genes,
+    });
+    showToast(
+      `Causal: ${result.causal_genes.length} causal, ${result.spurious_genes.length} spurious genes`,
+      'warning'
+    );
+    await loadCausalReport();
+  } else {
+    showToast('Causal analysis thất bại — chạy evolution trước để tích lũy dữ liệu', 'warning');
+  }
+}
+
+async function loadCausalReport() {
+  const result = await apiGet('/causal/report');
+  if (!result || result.status === 'no_report') return;
+
+  renderCausalInsights(result.insights || []);
+  renderCausalEffects((result.effects || []).slice(0, 10));
+  renderCausalRegimeMap(result.regime_fitness || []);
+  renderCausalWorldModel(result.world_model || {});
+  renderCausalSummary({
+    pool_size    : result.pool_size,
+    causal_genes : result.causal_genes || [],
+    spurious_genes: result.spurious_genes || [],
+    neutral_genes : result.neutral_genes || [],
+  });
+  renderCausalCF(result.counterfactuals || []);
+}
+
+async function queryCausalCounterfactual() {
+  const from = document.getElementById('cf-regime-from').value;
+  const to   = document.getElementById('cf-regime-to').value;
+  const result = await apiGet(`/causal/counterfactual?regime_from=${from}&regime_to=${to}`);
+  if (result && result.status === 'ok') {
+    renderCausalCFResult(result.counterfactuals, result.n_survived, from, to);
+  }
+}
+
+function renderCausalInsights(insights) {
+  const card = document.getElementById('causal-insights-card');
+  const body = document.getElementById('causal-insights-body');
+  if (!card || !body || !insights.length) return;
+  card.style.display = '';
+  body.innerHTML = insights.map(i =>
+    `<div class="d-flex gap-2 mb-1 small">
+       <span class="text-warning flex-shrink-0">•</span>
+       <span class="text-muted">${i}</span>
+     </div>`
+  ).join('');
+}
+
+function renderCausalEffects(effects) {
+  const card  = document.getElementById('causal-effects-card');
+  const tbody = document.querySelector('#causal-effects-table tbody');
+  if (!card || !tbody) return;
+  card.style.display = '';
+
+  tbody.innerHTML = (effects || []).map(e => {
+    let rowClass = '';
+    let badge    = '';
+    if (e.is_causal && !e.is_spurious) {
+      rowClass = 'table-success bg-opacity-10';
+      badge    = '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.65rem">C</span>';
+    } else if (e.is_spurious) {
+      rowClass = 'table-danger bg-opacity-10';
+      badge    = '<span class="badge bg-danger bg-opacity-25 text-danger" style="font-size:0.65rem">S</span>';
+    } else {
+      rowClass = '';
+      badge    = '<span class="badge bg-secondary bg-opacity-25 text-muted" style="font-size:0.65rem">N</span>';
+    }
+    const opt = e.optimal_range || [0, 0];
+    const aceStr = (e.causal_ace !== undefined)
+      ? (e.causal_ace >= 0 ? '+' : '') + e.causal_ace.toFixed(4)
+      : '—';
+    return `
+      <tr class="${rowClass}">
+        <td class="small">${badge} ${e.gene}</td>
+        <td class="small ${e.causal_ace > 0 ? 'text-success' : 'text-danger'}">${aceStr}</td>
+        <td class="small text-muted">${(e.simple_rho||0).toFixed(3)}</td>
+        <td class="small text-muted">${(e.partial_rho||0).toFixed(3)}</td>
+        <td class="small ${e.spurious_score > 0.15 ? 'text-danger' : 'text-muted'}">${(e.spurious_score||0).toFixed(3)}</td>
+        <td class="small text-info" style="font-size:0.7rem">${opt[0].toFixed(1)}–${opt[1].toFixed(1)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderCausalRegimeMap(regimeMaps) {
+  const card  = document.getElementById('causal-regime-card');
+  const tbody = document.querySelector('#causal-regime-table tbody');
+  if (!card || !tbody) return;
+  card.style.display = '';
+
+  const regimeEmojis = {
+    trend_up: '📈', trend_down: '📉', choppy: '↔',
+    high_vol_choppy: '🌊', crash: '💥', spike: '🚀', recovery: '🔄',
+  };
+
+  tbody.innerHTML = (regimeMaps || []).slice(0, 10).map(m => {
+    const emoji = regimeEmojis[m.regime_champion] || '?';
+    const survColor = m.survivability >= 0.7 ? 'text-success'
+                    : m.survivability >= 0.4 ? 'text-warning' : 'text-danger';
+    return `
+      <tr>
+        <td class="small text-muted">${m.genome_id}</td>
+        <td class="small text-info fw-bold">${(m.robust_score||0).toFixed(3)}</td>
+        <td class="small ${survColor}">${Math.round((m.survivability||0)*100)}%</td>
+        <td class="small text-muted" style="font-size:0.75rem">${emoji} ${m.regime_champion||'?'}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderCausalWorldModel(wm) {
+  const card = document.getElementById('causal-wm-card');
+  const body = document.getElementById('causal-wm-body');
+  if (!card || !body || !Object.keys(wm).length) return;
+  card.style.display = '';
+
+  const regimes = Object.keys(wm);
+  const emojis  = {
+    trend_up: '📈', trend_down: '📉', choppy: '↔',
+    high_vol_choppy: '🌊', crash: '💥', spike: '🚀', recovery: '🔄',
+  };
+
+  // Show top transitions from each regime (top-2 most probable)
+  let rows = '';
+  for (const from of regimes.slice(0, 5)) {
+    const probs = wm[from] || {};
+    const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]).slice(0, 2);
+    const toStr  = sorted.map(([r, p]) => `${emojis[r]||r} ${(p*100).toFixed(0)}%`).join('  ');
+    rows += `
+      <div class="d-flex justify-content-between small mb-1">
+        <span class="text-muted">${emojis[from]||'?'} ${from.replace('_',' ')}</span>
+        <span class="text-info">${toStr}</span>
+      </div>`;
+  }
+  body.innerHTML = `
+    <div class="text-muted small mb-2">Top-2 likely next regimes:</div>
+    ${rows}`;
+}
+
+function renderCausalSummary(stats) {
+  const card = document.getElementById('causal-summary-card');
+  const body = document.getElementById('causal-summary-body');
+  if (!card || !body) return;
+  card.style.display = '';
+
+  body.innerHTML = `
+    <div class="d-flex flex-wrap gap-2 small">
+      <div class="text-center p-2 border border-secondary rounded flex-fill">
+        <div class="fs-5 text-light fw-bold">${stats.pool_size || 0}</div>
+        <div class="text-muted">Pool</div>
+      </div>
+      <div class="text-center p-2 border border-success rounded flex-fill">
+        <div class="fs-5 text-success fw-bold">${(stats.causal_genes||[]).length}</div>
+        <div class="text-muted">Causal</div>
+      </div>
+      <div class="text-center p-2 border border-danger rounded flex-fill">
+        <div class="fs-5 text-danger fw-bold">${(stats.spurious_genes||[]).length}</div>
+        <div class="text-muted">Spurious</div>
+      </div>
+      <div class="text-center p-2 border border-secondary rounded flex-fill">
+        <div class="fs-5 text-muted fw-bold">${(stats.neutral_genes||[]).length}</div>
+        <div class="text-muted">Neutral</div>
+      </div>
+    </div>
+    ${(stats.causal_genes||[]).length ? `<div class="mt-2 small text-success">
+      Causal: ${(stats.causal_genes||[]).join(', ')}
+    </div>` : ''}
+    ${(stats.spurious_genes||[]).length ? `<div class="mt-1 small text-danger">
+      Spurious: ${(stats.spurious_genes||[]).join(', ')}
+    </div>` : ''}`;
+}
+
+function renderCausalCF(cfs) {
+  if (!cfs || !cfs.length) return;
+  const card = document.getElementById('causal-cf-card');
+  if (card) card.style.display = '';
+  renderCausalCFResult(cfs,
+    cfs.filter(cf => cf.survived).length,
+    cfs[0]?.regime_from || '?',
+    cfs[0]?.regime_to   || '?'
+  );
+}
+
+function renderCausalCFResult(cfs, nSurvived, regimeFrom, regimeTo) {
+  const cfCard = document.getElementById('causal-cf-card');
+  const result = document.getElementById('causal-cf-result');
+  if (cfCard) cfCard.style.display = '';
+  if (!result) return;
+
+  const survived    = cfs.filter(cf => cf.survived);
+  const notSurvived = cfs.filter(cf => !cf.survived);
+  const emojis = {
+    trend_up: '📈', trend_down: '📉', choppy: '↔',
+    high_vol_choppy: '🌊', crash: '💥', spike: '🚀', recovery: '🔄',
+  };
+
+  result.innerHTML = `
+    <div class="mb-2 small text-muted">
+      ${emojis[regimeFrom]||'?'} ${regimeFrom} → ${emojis[regimeTo]||'?'} ${regimeTo}:
+      <strong class="${nSurvived > 0 ? 'text-success' : 'text-danger'}">${nSurvived}</strong>
+      / ${cfs.length} survived
+    </div>
+    ${survived.slice(0, 3).map(cf => `
+      <div class="d-flex justify-content-between small mb-1 text-success">
+        <span>✅ ${cf.genome_id}</span>
+        <span>${cf.fitness_before.toFixed(4)} → ${cf.fitness_after.toFixed(4)}</span>
+      </div>`).join('')}
+    ${notSurvived.slice(0, 2).map(cf => `
+      <div class="d-flex justify-content-between small mb-1 text-danger">
+        <span>❌ ${cf.genome_id}</span>
+        <span>${cf.fitness_before.toFixed(4)} → ${cf.fitness_after.toFixed(4)}</span>
+      </div>`).join('')}`;
+}
+
 // ── Meta-Genetics Engine ─────────────────────────────────────────
 
 async function runMetaBreed() {
@@ -753,5 +994,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load meta report when meta tab is clicked
   document.querySelectorAll('[href="#tab-meta"]').forEach(el => {
     el.addEventListener('click', () => loadMetaReport());
+  });
+
+  // Load causal report when causal tab is clicked
+  document.querySelectorAll('[href="#tab-causal"]').forEach(el => {
+    el.addEventListener('click', () => loadCausalReport());
   });
 });
