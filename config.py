@@ -214,3 +214,83 @@ REDIS_MEMORY_RULES_KEY       = "Deriv_Mem_Rules"
 
 # Redis key lưu tổng hợp thống kê memory (JSON)
 REDIS_MEMORY_STATS_KEY       = "Deriv_Mem_Stats"
+
+# ============================================================
+# CANDLE LIBRARY — Thư viện nến 10.000 mẫu
+# ============================================================
+CANDLE_LIBRARY_COUNT     = 10000  # Số nến tải về cho thư viện học
+CANDLE_LIBRARY_DIR       = "candle_data"  # Thư mục lưu file parquet
+CANDLE_LIBRARY_REDIS_KEY = "Deriv_CandleLib:{symbol}"
+CANDLE_LIBRARY_REALTIME_KEY = "Deriv_CandleRT:{symbol}"
+CANDLE_REALTIME_MAX_CACHE   = 200   # Số nến realtime cache trong Redis
+
+# ============================================================
+# ML MODEL STACK — XGBoost / LR / Q-Learning / LSTM
+# ============================================================
+ML_MODELS_DIR            = "models"
+ML_FEATURE_WINDOW        = 60     # Cửa sổ nến cho LSTM sequence
+ML_RETRAIN_INTERVAL      = 50     # Retrain sau N lệnh mới
+ML_MIN_TRAIN_SAMPLES     = 100    # Cần ít nhất N mẫu để train
+ML_ENSEMBLE_WEIGHT_WIN   = 0.40   # Trọng số WinClassifier
+ML_ENSEMBLE_WEIGHT_QLEARN= 0.20   # Trọng số Q-Learning
+ML_ENSEMBLE_WEIGHT_LSTM  = 0.40   # Trọng số LSTM
+ML_ENABLED               = False  # Tắt theo mặc định cho đến khi train xong
+
+# ============================================================
+# CAPITAL STRATEGY — Chiến lược vốn
+# ============================================================
+# Loại: "fixed_fractional" | "martingale" | "anti_martingale"
+#       "victor2" | "victor3" | "victor4" | "custom"
+CAPITAL_STRATEGY         = "fixed_fractional"
+CAPITAL_STRATEGY_REDIS   = "Deriv_CapStrat_State"  # Lưu state Victor
+
+# Victor strategies stake sequences (from UI screenshots)
+VICTOR2_ROWS = [
+    [1,1,2,2,3,4,5,7,10,13,18,24,32,44,59,80,108,146,197,271],
+    [1,2,4,4,6,8,10,14,20,26,36,48,64,88,118,160,216,292,394,542],
+]
+VICTOR3_ROWS = [
+    [1,1,1,1,1,1,1.5,2,2,2,2.5,3,3,3.5,4,4,4.5,5.4,6,7,8,9.5,11],
+    [1,2,2,2,2,2,3,3.9,3.9,3.9,4.875,5.85,6.825,7.8,8.775,10.53,11.7,13.65,15.6,18.525,21.45],
+    [1,4,4,4,4,4,6,7.605,7.605,7.605,9.50625,11.4075,13.30875,15.21,17.11125,20.5335,22.815,26.6175,30.42,36.1],
+]
+VICTOR4_ROWS = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.23,1.25,1.28,1.3,1.47,1.6,1.74,1.88,2.04,2.22],
+    [1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,2.28,2.32,2.36,2.41,2.73,2.96,3.21,3.49,3.79],
+    [3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,4.22,4.29,4.37,4.45,5.04,5.47,5.94,6.44,6.99,7.59],
+    [7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.81,7.94,8.08,8.24,9.33,10.12,10.99,11.92,12.96,14.09],
+]
+
+# ============================================================
+# CONTROL SYSTEM — Daily TP/SL + Wave Direction Filter
+# ============================================================
+# Daily Take-Profit: dừng khi lãi >= ngưỡng này trong ngày (0 = tắt)
+DAILY_TAKE_PROFIT_USD    = 0.0
+# Daily Stop-Loss: dừng khi lỗ >= ngưỡng này trong ngày (0 = dùng RISK_MAX_DAILY_LOSS_PCT)
+DAILY_STOP_LOSS_USD      = 0.0
+# Redis key đánh dấu "đã dừng bởi TP/SL hôm nay"
+DAILY_TPSL_STOPPED_KEY   = "Deriv_DailyTPSL_Stopped"
+DAILY_TPSL_REASON_KEY    = "Deriv_DailyTPSL_Reason"
+
+# Wave direction filter: "both" | "up_only" | "down_only"
+WAVE_DIRECTION_FILTER    = "both"
+
+# ============================================================
+# LLM AGENT — RAG + Function Calling (tắt mặc định)
+# ============================================================
+LLM_ENABLED              = False   # Bật khi có API key
+LLM_BASE_URL             = "https://api.openai.com/v1"
+LLM_MODEL                = "gpt-4o-mini"
+LLM_API_KEY              = ""      # Đặt trong .env
+LLM_MAX_TOKENS           = 512
+LLM_ADVICE_ONLY          = True    # LLM chỉ tư vấn, không tự thực thi lệnh
+LLM_RAG_TOP_K            = 5       # Số kết quả tìm kiếm ngữ nghĩa
+VECTOR_STORE_FILE        = "vector_store.json"
+
+# ============================================================
+# API SERVER
+# ============================================================
+API_HOST                 = "0.0.0.0"
+API_PORT                 = 8000
+API_SECRET_KEY           = "changeme_in_env"   # JWT secret
+API_CORS_ORIGINS         = ["http://localhost:3000", "http://localhost:8000"]
