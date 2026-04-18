@@ -1,0 +1,256 @@
+{
+  "pool_size": 40,
+  "n_winners_used": 20,
+  "n_archetypes": 4,
+  "top_genes": [
+    "wave_weight",
+    "rsi_near_ob",
+    "lookahead_candles",
+    "bb_weight",
+    "rsi_near_os"
+  ],
+  "gene_importances": {
+    "wave_weight": 0.2463,
+    "rsi_near_ob": 0.2034,
+    "lookahead_candles": 0.2013,
+    "bb_weight": 0.1976,
+    "rsi_near_os": 0.1818,
+    "rsi_overbought": 0.1729,
+    "macd_weight": 0.168,
+    "min_signal_score": 0.1655,
+    "min_wave_score": 0.1303,
+    "rsi_weight": 0.1178,
+    "momentum_weight": 0.1122,
+    "rsi_oversold": 0.0909,
+    "bb_tight_threshold": 0.0882
+  },
+  "archetypes": [
+    {
+      "archetype_id": "arch_3",
+      "label": "Archetype-3",
+      "centroid": {
+        "rsi_oversold": 31.9182,
+        "rsi_overbought": 71.8253,
+        "rsi_near_os": 40.2258,
+        "rsi_near_ob": 67.1949,
+        "rsi_weight": 1.2952,
+        "momentum_weight": 1.7985,
+        "macd_weight": 1.3127,
+        "bb_weight": 1.0883,
+        "wave_weight": 1.2381,
+        "min_signal_score": 65.8363,
+        "min_wave_score": 12.6558,
+        "bb_tight_threshold": 0.1663,
+        "lookahead_candles": 6.1111
+      },
+      "member_ids": [
+        "01345839",
+        "4948f69a",
+        "734fe005",
+        "7796d496",
+        "4576b314",
+        "b85b72aa",
+        "48400c49",
+        "4199a1e6",
+        "6b25da21"
+      ],
+      "mean_fitness": 0.203,
+      "mean_win_rate": 55.74,
+      "mean_pf": 1.737,
+      "n_members": 9,
+      "description": "[Archetype-3] 9 members  Avg fitness=0.2030  WR=55.7%  PF=1.74  wave_weight=1.24  min_score=65.8  lookahead=6"
+    },
+    {
+      "archetype_id": "arch_0",
+      "label": "Aggressive + Momentum + MeanReversion",
+      "centroid": {
+        "rsi_oversold": 21.752,
+        "rsi_overbought": 75.7421,
+        "rsi_near_os": 46.2728,
+        "rsi_near_ob": 58.4244,
+        "rsi_weight": 1.5495,
+        "momentum_weight": 1.242,
+        "macd_weight": 2.0828,
+        "bb_weight": 1.6967,
+        "wave_weight": 0.7732,
+        "min_signal_score": 44.1453,
+        "min_wave_score": 18.5502,
+        "bb_tight_threshold": 0.1262,
+        "lookahead_candles": 8.0
+      },
+      "member_ids": [
+        "8107ebb7",
+        "a4339745",
+        "764d4cc1",
+        "ae1bd2d6"
+      ],
+      "mean_fitness": 0.2021,
+      "mean_win_rate": 58.75,
+      "mean_pf": 1.517,
+      "n_members": 4,
+      "description": "[Aggressive + Momentum + MeanReversion] 4 members  Avg fitness=0.2021  WR=58.8%  PF=1.52  wave_weight=0.77  min_score=44.1  lookahead=8"
+    },
+    {
+      "archetype_id": "arch_2",
+      "label": "Wave-Heavy + Slow + MeanReversion",
+      "centroid": {
+        "rsi_oversold": 26.4118,
+        "rsi_overbought": 69.2534,
+        "rsi_near_os": 32.5658,
+        "rsi_near_ob": 53.3507,
+        "rsi_weight": 1.7481,
+        "momentum_weight": 0.7186,
+        "macd_weight": 1.1996,
+        "bb_weight": 1.4621,
+        "wave_weight": 1.61,
+        "min_signal_score": 55.9199,
+        "min_wave_score": 19.1826,
+        "bb_tight_threshold": 0.1109,
+        "lookahead_candles": 11.75
+      },
+      "member_ids": [
+        "1da5355a",
+        "5a3b7011",
+        "9ce56d0d",
+        "9ba33c68"
+      ],
+      "mean_fitness": 0.1981,
+      "mean_win_rate": 60.05,
+      "mean_pf": 1.844,
+      "n_members": 4,
+      "description": "[Wave-Heavy + Slow + MeanReversion] 4 members  Avg fitness=0.1981  WR=60.0%  PF=1.84  wave_weight=1.61  min_score=55.9  lookahead=12"
+    },
+    {
+      "archetype_id": "arch_1",
+      "label": "Slow + MeanReversion",
+      "centroid": {
+        "rsi_oversold": 24.5751,
+        "rsi_overbought": 82.2033,
+        "rsi_near_os": 33.8613,
+        "rsi_near_ob": 71.0644,
+        "rsi_weight": 1.3671,
+        "momentum_weight": 1.2352,
+        "macd_weight": 1.5886,
+        "bb_weight": 2.1612,
+        "wave_weight": 1.48,
+        "min_signal_score": 60.4326,
+        "min_wave_score": 18.9587,
+        "bb_tight_threshold": 0.1575,
+        "lookahead_candles": 11.3333
+      },
+      "member_ids": [
+        "9c91ef1e",
+        "2fb324ac",
+        "910b4f7c"
+      ],
+      "mean_fitness": 0.1877,
+      "mean_win_rate": 54.35,
+      "mean_pf": 1.61,
+      "n_members": 3,
+      "description": "[Slow + MeanReversion] 3 members  Avg fitness=0.1877  WR=54.4%  PF=1.61  wave_weight=1.48  min_score=60.4  lookahead=11"
+    }
+  ],
+  "winner_patterns": {
+    "rsi_oversold": {
+      "low_pct": 18.2394,
+      "median": 28.7574,
+      "high_pct": 38.2576,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "rsi_overbought": {
+      "low_pct": 68.1448,
+      "median": 71.8624,
+      "high_pct": 83.2105,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "rsi_near_os": {
+      "low_pct": 28.815,
+      "median": 39.5086,
+      "high_pct": 46.8756,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "rsi_near_ob": {
+      "low_pct": 52.4678,
+      "median": 67.1143,
+      "high_pct": 69.6037,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "rsi_weight": {
+      "low_pct": 0.4904,
+      "median": 1.4476,
+      "high_pct": 2.1706,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "momentum_weight": {
+      "low_pct": 0.4117,
+      "median": 1.5553,
+      "high_pct": 2.3266,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "macd_weight": {
+      "low_pct": 0.5888,
+      "median": 1.6977,
+      "high_pct": 2.345,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "bb_weight": {
+      "low_pct": 0.5486,
+      "median": 1.5288,
+      "high_pct": 2.1238,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "wave_weight": {
+      "low_pct": 0.3777,
+      "median": 1.1398,
+      "high_pct": 2.5465,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "min_signal_score": {
+      "low_pct": 43.9252,
+      "median": 58.2978,
+      "high_pct": 79.8698,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "min_wave_score": {
+      "low_pct": 4.1631,
+      "median": 17.3297,
+      "high_pct": 27.0026,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "bb_tight_threshold": {
+      "low_pct": 0.0677,
+      "median": 0.1373,
+      "high_pct": 0.2339,
+      "tight_range": false,
+      "is_universal": false
+    },
+    "lookahead_candles": {
+      "low_pct": 3.0,
+      "median": 10.0,
+      "high_pct": 12.1,
+      "tight_range": false,
+      "is_universal": false
+    }
+  },
+  "insights": [
+    "Gene quan tr\u1ecdng nh\u1ea5t: wave_weight (\u03c1=-0.243, h\u01b0\u1edbng=negative)",
+    "Gene \u00edt quan tr\u1ecdng nh\u1ea5t: bb_tight_threshold \u2014 c\u00f3 th\u1ec3 mutate t\u1ef1 do",
+    "T\u0103ng gi\u00e1 tr\u1ecb gi\u00fap th\u1eafng: rsi_near_ob, bb_weight, rsi_near_os",
+    "Gi\u1ea3m gi\u00e1 tr\u1ecb gi\u00fap th\u1eafng: wave_weight, lookahead_candles, min_signal_score",
+    "Archetype m\u1ea1nh nh\u1ea5t: [Archetype-3] fitness=0.2030",
+    "T\u1ed5ng 4 archetype \u2014 n\u00ean breed hybrid t\u1eeb best 2 archetypes \u0111\u1ec3 t\u1eadn d\u1ee5ng \u0111a d\u1ea1ng"
+  ],
+  "n_seeds_generated": 8,
+  "timestamp": "2026-04-18T03:01:18.602282"
+}

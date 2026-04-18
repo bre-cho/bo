@@ -48,16 +48,28 @@ from pipeline     import (
 )
 import deriv_data
 
+# ── New components (lazy-loaded to avoid hard dependency) ─────────
+try:
+    from control_system     import ControlSystem
+    from capital_strategy   import CapitalStrategyManager
+    from candle_library     import CandleLibraryManager
+    from model_registry     import ModelRegistry
+    _HAS_NEW_COMPONENTS = True
+except ImportError as _e:
+    _HAS_NEW_COMPONENTS = False
+    print(f"[Engine] New components not available: {_e}")
+
 
 # ──────────────────────────────────────────────────────────────────
 # System state enum
 # ──────────────────────────────────────────────────────────────────
 
 class SystemMode(str, Enum):
-    LIVE     = "LIVE"
-    PAPER    = "PAPER"
-    PAUSED   = "PAUSED"
-    LEARNING = "LEARNING"
+    LIVE      = "LIVE"
+    PAPER     = "PAPER"
+    PAUSED    = "PAUSED"
+    LEARNING  = "LEARNING"
+    EVOLVING  = "EVOLVING"
 
 
 _REDIS_MODE_KEY       = "Deriv_System_Mode"
@@ -105,6 +117,50 @@ class DecisionEngine:
         self._mode               = self._load_mode()
         self._cycle_count        = 0
 
+        # ── New components ────────────────────────────────────────
+        if _HAS_NEW_COMPONENTS:
+            self.control      = ControlSystem()
+            self.cap_strat    = CapitalStrategyManager()
+            self.candle_lib   = CandleLibraryManager(self._active_symbols)
+            self.model_reg    = ModelRegistry()
+            self.candle_lib.load_all()  # Load cached libraries on startup
+        else:
+            self.control   = None
+            self.cap_strat = None
+            self.candle_lib= None
+            self.model_reg = None
+
+        # ── Cold-start synthetic training ─────────────────────────
+        if config.ML_ENABLED and config.SYNTH_COLD_START:
+            self._cold_start_synthetic_training()
+
+    # ── Cold-start synthetic training ────────────────────────────
+
+    def _cold_start_synthetic_training(self) -> None:
+        """
+        Chạy synthetic training ngay khi khởi động nếu chưa có models.
+        Đảm bảo model sẵn sàng trước lệnh đầu tiên.
+        """
+        import os as _os
+        model_file = _os.path.join(config.ML_MODELS_DIR, "win_classifier.pkl")
+        if _os.path.exists(model_file):
+            return  # Models already trained — skip cold start
+
+        print("\n  🏋️  [ColdStart] No models found — running synthetic pre-training...")
+        try:
+            from synthetic_engine import run_full_synthetic_training
+            metrics = run_full_synthetic_training()
+            if self.model_reg is not None:
+                self.model_reg.register(
+                    "win_classifier",
+                    n_train    = metrics["n_samples"],
+                    train_score= metrics["win_clf_auc"],
+                )
+            print(f"  🏋️  [ColdStart] Done: AUC={metrics['win_clf_auc']:.4f}  "
+                  f"n={metrics['n_samples']}  LSTM={'ok' if metrics['lstm_trained'] else 'skip'}")
+        except Exception as exc:
+            print(f"  🏋️  [ColdStart] Synthetic training failed: {exc}")
+
     # ── Persistence ───────────────────────────────────────────────
 
     def _load_mode(self) -> SystemMode:
@@ -141,12 +197,19 @@ class DecisionEngine:
         Quyết định hệ thống nên làm gì trong chu kỳ này.
 
         Ưu tiên:
-          PAUSED   : khi risk gate block giao dịch
+          PAUSED   : khi risk gate block giao dịch hoặc ControlSystem stop
           LEARNING : khi đủ history và đến kỳ học lại
           PAPER    : khi mode hiện tại là PAPER
           LIVE     : trạng thái bình thường
         """
-        # Kiểm tra risk gate trước
+        # Kiểm tra ControlSystem daily TP/SL trước
+        if self.control is not None:
+            ctrl_ok, ctrl_reason = self.control.can_trade(daily_pnl=self.risk.state.daily_pnl)
+            if not ctrl_ok:
+                print(f"  [ControlSystem] 🛑 {ctrl_reason}")
+                return SystemMode.PAUSED
+
+        # Kiểm tra risk gate
         allowed, _ = self.risk.can_trade(balance=balance)
         if not allowed:
             return SystemMode.PAUSED
@@ -294,9 +357,11 @@ class DecisionEngine:
                 # ② tự quyết định — tính win_prob + confidence
                 should_enter, pred = self.decide_entry(best, df, balance)
 
-                # Tính stake
+                # Tính stake — ưu tiên CapitalStrategyManager nếu có
                 if pred and pred.stake_suggestion > 0:
                     stake = pred.stake_suggestion
+                elif self.cap_strat is not None:
+                    stake = self.cap_strat.next_stake(balance, best.score)
                 else:
                     params = self.learner.get_params()
                     stake  = round(
@@ -418,6 +483,13 @@ class DecisionEngine:
         if features is not None:
             self.memory.record_outcome(features, won=won, pnl=pnl)
 
+        # ── Cập nhật CapitalStrategyManager ──────────────────────
+        if self.cap_strat is not None:
+            try:
+                self.cap_strat.update(won=won, pnl=pnl)
+            except Exception:
+                pass
+
         signal = trade.signal_ref
         record = TradeRecord(
             timestamp    = ts.isoformat(),
@@ -495,6 +567,71 @@ class DecisionEngine:
         finally:
             self._save_mode(prev_mode)
 
+        # ── ML Model retrain (if enabled and enough data) ─────────
+        if config.ML_ENABLED and self._cycle_count % config.ML_RETRAIN_INTERVAL == 0:
+            try:
+                from ml_models import EnsembleScorer
+                from feature_pipeline import build_training_dataset
+                import json as _json
+                raw_history   = self._r.lrange(config.REDIS_LOG_KEY, 0, -1)
+                trade_history = [_json.loads(r) for r in raw_history]
+                # Use candle library if available, else fetch fresh
+                if self.candle_lib is not None:
+                    df = self.candle_lib.get(config.SYMBOL).get_dataframe()
+                else:
+                    df = deriv_data.fetch_candles(count=config.SIM_CANDLE_COUNT)
+
+                # Build real feature dataset
+                real_X, real_y = (None, None)
+                if df is not None and not df.empty:
+                    real_X, real_y = build_training_dataset(df)
+
+                n_real = len(real_X) if real_X is not None else 0
+
+                # ── Synthetic boost: kick in when real data insufficient ──
+                if config.SYNTH_AUTO_BOOST and n_real < config.ML_MIN_TRAIN_SAMPLES:
+                    print(
+                        f"  🏋️  [Synthetic] Real samples={n_real} < {config.ML_MIN_TRAIN_SAMPLES} "
+                        f"— activating synthetic boost..."
+                    )
+                    from synthetic_engine import run_full_synthetic_training
+                    synth_metrics = run_full_synthetic_training(
+                        real_df = df,
+                        real_X  = real_X if n_real > 0 else None,
+                        real_y  = real_y if n_real > 0 else None,
+                    )
+                    if self.model_reg is not None:
+                        self.model_reg.register(
+                            "win_classifier",
+                            n_train    = synth_metrics["n_samples"],
+                            train_score= synth_metrics["win_clf_auc"],
+                        )
+                    print(f"  🏋️  [Synthetic] Done: AUC={synth_metrics['win_clf_auc']:.4f}  "
+                          f"n={synth_metrics['n_samples']}")
+                elif df is not None and not df.empty:
+                    # Enough real data — use normal retrain + synth blend
+                    scorer = EnsembleScorer()
+                    scorer.retrain_all(df, trade_history)
+                    if self.model_reg is not None:
+                        try:
+                            actual_score = getattr(scorer.win_clf._model, 'cv_values_', None)
+                            if actual_score is not None:
+                                import numpy as _np
+                                train_score = float(_np.mean(actual_score))
+                            else:
+                                train_score = 0.0
+                        except Exception:
+                            train_score = 0.0
+                        self.model_reg.register("win_classifier", n_train=len(trade_history), train_score=train_score)
+                    print(f"  🤖 [ML] Retrain complete ({len(trade_history)} trade samples)")
+            except Exception as exc:
+                print(f"  🤖 [ML] Retrain failed: {exc}")
+
+        # ── Evolution cycle (if enabled and interval reached) ─────
+        evol_interval = getattr(config, "EVOL_AUTO_INTERVAL", 0)
+        if evol_interval > 0 and self._cycle_count % evol_interval == 0:
+            self.trigger_evolution()
+
     # ── ⑦ tự mô phỏng on-demand ──────────────────────────────────
 
     def run_simulation(self, symbol: str) -> None:
@@ -511,6 +648,53 @@ class DecisionEngine:
             )
         except Exception as exc:
             print(f"  🔬 [Sim] Lỗi backtest {symbol}: {exc}")
+
+    # ── ⑧ tự tiến hóa ────────────────────────────────────────────
+
+    def trigger_evolution(
+        self,
+        generations: int = None,
+        pop_size   : int = None,
+        n_envs     : int = None,
+    ) -> None:
+        """
+        Chạy một chu kỳ tiến hóa (Self-Play + Genetic Algorithm).
+
+        Quy trình:
+          1. Sinh quần thể chiến lược (genomes)
+          2. Cho cạnh tranh trong đấu trường môi trường đa dạng
+          3. Chọn kẻ thắng, lai ghép + đột biến → thế hệ mới
+          4. Lặp lại N thế hệ
+          5. Thăng chức champion lên Redis → áp dụng ngay vào engine
+
+        Kết quả:
+          - config.MIN_SIGNAL_SCORE cập nhật theo champion
+          - config.RSI_OVERSOLD / RSI_OVERBOUGHT cập nhật
+          - Genome tốt nhất lưu vào Redis + file models/champion_genome.json
+        """
+        prev_mode = self._mode
+        self._save_mode(SystemMode.EVOLVING)
+        try:
+            from evolution_engine import run_evolution_cycle, apply_champion_to_config
+            print(f"\n  🧬 [Evolution] Starting self-play evolution cycle...")
+            champion = run_evolution_cycle(
+                generations = generations or config.EVOL_GENERATIONS,
+                pop_size    = pop_size    or config.EVOL_POP_SIZE,
+                n_envs      = n_envs      or config.EVOL_N_ENVIRONMENTS,
+                verbose     = True,
+            )
+            if config.EVOL_AUTO_PROMOTE and champion.fitness > 0.01:
+                apply_champion_to_config()
+                print(
+                    f"  🧬 [Evolution] Champion applied: "
+                    f"min_score={config.MIN_SIGNAL_SCORE:.1f}  "
+                    f"rsi_os={config.RSI_OVERSOLD:.1f}  "
+                    f"rsi_ob={config.RSI_OVERBOUGHT:.1f}"
+                )
+        except Exception as exc:
+            print(f"  🧬 [Evolution] Failed: {exc}")
+        finally:
+            self._save_mode(prev_mode)
 
     # ── ⑧ tự scale ───────────────────────────────────────────────
 
@@ -593,6 +777,16 @@ class DecisionEngine:
             f"(block_threshold≥{config.MEMORY_HARD_BLOCK_LOSS_RATE*100:.0f}% loss  "
             f"min_samples={config.MEMORY_MIN_SAMPLES_FOR_RULE})"
         )
+        # Control System + Capital Strategy
+        if self.control is not None:
+            print(f"  Control  : {self.control.summary()}")
+        if self.cap_strat is not None:
+            cs = self.cap_strat.status()
+            print(
+                f"  CapStrat : {cs['strategy']}  base=${cs['base_stake']}  "
+                f"W-streak={cs['consecutive_win']}  L-streak={cs['consecutive_loss']}  "
+                f"PnL={cs['cycle_pnl']:+.2f}"
+            )
 
     # ── Master run loop ───────────────────────────────────────────
 

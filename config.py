@@ -214,3 +214,191 @@ REDIS_MEMORY_RULES_KEY       = "Deriv_Mem_Rules"
 
 # Redis key lưu tổng hợp thống kê memory (JSON)
 REDIS_MEMORY_STATS_KEY       = "Deriv_Mem_Stats"
+
+# ============================================================
+# CANDLE LIBRARY — Thư viện nến 10.000 mẫu
+# ============================================================
+CANDLE_LIBRARY_COUNT     = 10000  # Số nến tải về cho thư viện học
+CANDLE_LIBRARY_DIR       = "candle_data"  # Thư mục lưu file parquet
+CANDLE_LIBRARY_REDIS_KEY = "Deriv_CandleLib:{symbol}"
+CANDLE_LIBRARY_REALTIME_KEY = "Deriv_CandleRT:{symbol}"
+CANDLE_REALTIME_MAX_CACHE   = 200   # Số nến realtime cache trong Redis
+
+# ============================================================
+# ML MODEL STACK — XGBoost / LR / Q-Learning / LSTM
+# ============================================================
+ML_MODELS_DIR            = "models"
+ML_FEATURE_WINDOW        = 60     # Cửa sổ nến cho LSTM sequence
+ML_RETRAIN_INTERVAL      = 50     # Retrain sau N lệnh mới
+ML_MIN_TRAIN_SAMPLES     = 100    # Cần ít nhất N mẫu để train
+ML_ENSEMBLE_WEIGHT_WIN   = 0.40   # Trọng số WinClassifier
+ML_ENSEMBLE_WEIGHT_QLEARN= 0.20   # Trọng số Q-Learning
+ML_ENSEMBLE_WEIGHT_LSTM  = 0.40   # Trọng số LSTM
+ML_ENABLED               = False  # Tắt theo mặc định cho đến khi train xong
+
+# ============================================================
+# CAPITAL STRATEGY — Chiến lược vốn
+# ============================================================
+# Loại: "fixed_fractional" | "martingale" | "anti_martingale"
+#       "victor2" | "victor3" | "victor4" | "custom"
+CAPITAL_STRATEGY         = "fixed_fractional"
+CAPITAL_STRATEGY_REDIS   = "Deriv_CapStrat_State"  # Lưu state Victor
+
+# Victor strategies stake sequences (from UI screenshots)
+VICTOR2_ROWS = [
+    [1,1,2,2,3,4,5,7,10,13,18,24,32,44,59,80,108,146,197,271],
+    [1,2,4,4,6,8,10,14,20,26,36,48,64,88,118,160,216,292,394,542],
+]
+VICTOR3_ROWS = [
+    [1,1,1,1,1,1,1.5,2,2,2,2.5,3,3,3.5,4,4,4.5,5.4,6,7,8,9.5,11],
+    [1,2,2,2,2,2,3,3.9,3.9,3.9,4.875,5.85,6.825,7.8,8.775,10.53,11.7,13.65,15.6,18.525,21.45],
+    [1,4,4,4,4,4,6,7.605,7.605,7.605,9.50625,11.4075,13.30875,15.21,17.11125,20.5335,22.815,26.6175,30.42,36.1],
+]
+VICTOR4_ROWS = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1.23,1.25,1.28,1.3,1.47,1.6,1.74,1.88,2.04,2.22],
+    [1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,1.95,2.28,2.32,2.36,2.41,2.73,2.96,3.21,3.49,3.79],
+    [3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,3.8,4.22,4.29,4.37,4.45,5.04,5.47,5.94,6.44,6.99,7.59],
+    [7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.41,7.81,7.94,8.08,8.24,9.33,10.12,10.99,11.92,12.96,14.09],
+]
+
+# ============================================================
+# CONTROL SYSTEM — Daily TP/SL + Wave Direction Filter
+# ============================================================
+# Daily Take-Profit: dừng khi lãi >= ngưỡng này trong ngày (0 = tắt)
+DAILY_TAKE_PROFIT_USD    = 0.0
+# Daily Stop-Loss: dừng khi lỗ >= ngưỡng này trong ngày (0 = dùng RISK_MAX_DAILY_LOSS_PCT)
+DAILY_STOP_LOSS_USD      = 0.0
+# Redis key đánh dấu "đã dừng bởi TP/SL hôm nay"
+DAILY_TPSL_STOPPED_KEY   = "Deriv_DailyTPSL_Stopped"
+DAILY_TPSL_REASON_KEY    = "Deriv_DailyTPSL_Reason"
+
+# Wave direction filter: "both" | "up_only" | "down_only"
+WAVE_DIRECTION_FILTER    = "both"
+
+# ============================================================
+# LLM AGENT — RAG + Function Calling (tắt mặc định)
+# ============================================================
+LLM_ENABLED              = False   # Bật khi có API key
+LLM_BASE_URL             = "https://api.openai.com/v1"
+LLM_MODEL                = "gpt-4o-mini"
+LLM_API_KEY              = ""      # Đặt trong .env
+LLM_MAX_TOKENS           = 512
+LLM_ADVICE_ONLY          = True    # LLM chỉ tư vấn, không tự thực thi lệnh
+LLM_RAG_TOP_K            = 5       # Số kết quả tìm kiếm ngữ nghĩa
+VECTOR_STORE_FILE        = "vector_store.json"
+
+# ============================================================
+# API SERVER
+# ============================================================
+API_HOST                 = "0.0.0.0"
+API_PORT                 = 8000
+API_SECRET_KEY           = "changeme_in_env"   # JWT secret
+API_CORS_ORIGINS         = ["http://localhost:3000", "http://localhost:8000"]
+
+# ============================================================
+# SYNTHETIC SIGNAL ENGINE — Data Generation + Augmentation
+# ============================================================
+# Số synthetic samples sinh ra mỗi loại regime (trend/chop/crash/...)
+SYNTH_N_PER_REGIME       = 150
+# Tỉ lệ synthetic trong tập train khi blend với real data
+# 0.5 = 50% real + 50% synthetic; 1.0 = 100% synthetic (cold start)
+SYNTH_BLEND_RATIO        = 0.50
+# Bật tự động synthetic boost khi real samples < ML_MIN_TRAIN_SAMPLES
+SYNTH_AUTO_BOOST         = True
+# Chạy synthetic training khi khởi động lần đầu (cold start)
+SYNTH_COLD_START         = True
+
+# ============================================================
+# EVOLUTION ENGINE — Self-Play + Simulation Environment
+# ============================================================
+# Kích thước quần thể (số genomes mỗi thế hệ)
+EVOL_POP_SIZE            = 30
+# Số thế hệ tiến hóa mỗi lần chạy
+EVOL_GENERATIONS         = 10
+# Số môi trường thị trường (regime environments) mỗi genome phải vượt qua
+EVOL_N_ENVIRONMENTS      = 8
+# Số nến trong mỗi môi trường (nhiều hơn = chính xác hơn, chậm hơn)
+EVOL_ENV_CANDLES         = 200
+# Số elites được bảo toàn qua mỗi thế hệ (không đột biến)
+EVOL_N_ELITES            = 4
+# Tỉ lệ đột biến mỗi gene (0.15 = 15% gene bị thay đổi)
+EVOL_MUTATION_RATE       = 0.15
+# Độ lớn đột biến (tỉ lệ range của gene)
+EVOL_MUTATION_SIGMA      = 0.12
+# Tỉ lệ lai ghép (xác suất thực hiện crossover thay vì copy)
+EVOL_CROSSOVER_RATE      = 0.70
+# Kích thước tournament (k candidate) trong tournament selection
+EVOL_TOURNAMENT_K        = 4
+# Tự động chạy evolution sau mỗi N learning cycles
+EVOL_AUTO_INTERVAL       = 100  # chu kỳ (0 = tắt)
+# Tự áp dụng champion genome lên config khi evolution xong
+EVOL_AUTO_PROMOTE        = True
+
+# ============================================================
+# META-LEARNING — Strategy Genome Engine
+# ============================================================
+# Kích thước tối đa gene pool (số genome tích lũy qua các runs)
+META_POOL_MAX_SIZE       = 500
+# Số winners dùng để phân tích pattern + archetype clustering
+META_TOP_K_WINNERS       = 30
+# Số archetype cluster (chiến lược nền khác nhau)
+META_N_ARCHETYPES        = 4
+# Số seeds meta-guided sinh ra cho evolution tiếp theo
+META_N_SEEDS             = 12
+
+# ============================================================
+# CAUSAL ENGINE — World Model + Causal Strategy Intelligence
+# ============================================================
+# Fast mode: dùng partial correlation proxy thay vì full intervention simulation
+# False = chạy actual do-calculus interventions (chậm hơn, chính xác hơn)
+CAUSAL_FAST_MODE         = True
+# Số genomes dùng làm "probe" trong intervention simulation
+CAUSAL_N_PROBE_GENOMES   = 6
+# Số môi trường dùng để tính ACE (nhiều hơn = ít variance hơn)
+CAUSAL_N_ENVS            = 5
+# Số nến mỗi môi trường trong causal evaluation
+CAUSAL_ENV_CANDLES       = 150
+# Ngưỡng ACE để coi 1 gene là "causal" (can thiệp tạo ra sự thay đổi)
+CAUSAL_ACE_THRESHOLD     = 0.002
+# Ngưỡng spurious score để coi 1 gene là "spurious correlation"
+CAUSAL_SPURIOUS_THRESHOLD = 0.15
+# Số môi trường per regime cho world model
+CAUSAL_REGIME_ENVS       = 1
+# Số genome top để build regime fitness map
+CAUSAL_TOP_K_GENOMES     = 12
+# Fitness threshold để coi 1 genome là "sống sót" trong một regime
+CAUSAL_FIT_THRESHOLD     = 0.01
+
+# ============================================================
+# UTILITY ENGINE — Decision Theory + Utility Optimization
+# ============================================================
+# Fractional Kelly multiplier (0.25 = quarter-Kelly: safer, ~55% max growth)
+UTILITY_KELLY_FRACTION   = 0.25
+# Hard cap on Kelly stake (never bet more than this fraction of bankroll)
+UTILITY_MAX_KELLY        = 0.20
+# Temporal discount rate λ (0 = no discounting; 0.2 = moderate near-term preference)
+UTILITY_DISCOUNT_RATE    = 0.20
+# Default utility weight preset ("balanced" / "aggressive" / "conservative" / "speed" / "stable")
+UTILITY_DEFAULT_PRESET   = "balanced"
+# Minimum pool size before utility optimization runs
+UTILITY_MIN_POOL_SIZE    = 8
+
+# ============================================================
+# GAME THEORY ENGINE — Multi-Agent + Market Ecosystem
+# ============================================================
+# Base win probability (before crowding / platform pressure adjustments)
+GAME_BASE_WIN_PROB        = 0.55
+# Crowding discount: payout reduction when many bots bet same direction
+GAME_CROWDING_DISCOUNT    = 0.10
+# EXP3 exploration rate γ (fraction of time uniform exploration)
+GAME_EXP3_GAMMA           = 0.10
+# EXP3 learning rate η
+GAME_EXP3_ETA             = 0.10
+# Number of rounds in ecosystem simulation
+GAME_SIM_ROUNDS           = 100
+# Number of opponent bots in simulation
+GAME_N_OPPONENTS          = 4
+# Fictitious play iterations for Nash approximation
+GAME_FP_ITERATIONS        = 500
+# Minimum trade samples for platform pressure detection
+GAME_PRESSURE_MIN_SAMPLES = 20

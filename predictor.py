@@ -101,7 +101,6 @@ def predict(
 
     # ── 1. Xác suất cơ bản từ điểm tín hiệu ─────────────────────
     # score=60 → 52%, score=80 → 61%, score=100 → 72%
-    # Công thức tuyến tính trên [60, 100] → [0.52, 0.72]
     base_win_prob = float(np.clip(0.50 + (base_score - 60) / 40 * 0.22, 0.45, 0.75))
 
     # ── 2. Điều chỉnh từ sóng ────────────────────────────────────
@@ -118,13 +117,13 @@ def predict(
         at_sr       = signal.wave.at_support_resistance
 
         if fib_strong and at_sr and depth_ideal:
-            wave_boost = 0.08   # Tất cả xác nhận → tăng mạnh
+            wave_boost = 0.08
         elif fib_strong and (at_sr or depth_ideal):
             wave_boost = 0.05
         elif fib_zone in ("F382", "F786") and depth_ideal:
             wave_boost = 0.03
         elif depth > 70.0:
-            wave_boost = -0.05  # Sóng hồi quá sâu → rủi ro cao hơn
+            wave_boost = -0.05
 
     # ── 3. Điều chỉnh từ lịch sử học ────────────────────────────
     history_adj = 0.0
@@ -134,24 +133,47 @@ def predict(
         params     = learner.get_params()
         stake_mult = params.stake_multiplier
         if learner.is_condition_weak(base_score, fib_zone, wave_active):
-            history_adj = -0.07   # Điều kiện từng yếu → hạ xác suất
+            history_adj = -0.07
 
     # ── 4. Điều chỉnh từ biến động ───────────────────────────────
     vol_adj = 0.0
     try:
         rel_atr = _relative_atr(df)
         if rel_atr > config.PREDICT_HIGH_VOLATILITY_ATR:
-            vol_adj = -0.04   # Biến động cao → kém ổn định
+            vol_adj = -0.04
         elif rel_atr < config.PREDICT_LOW_VOLATILITY_ATR:
-            vol_adj = +0.02   # Biến động thấp → ổn định hơn
+            vol_adj = +0.02
     except Exception:
         pass
 
+    # ── 5. ML Ensemble điều chỉnh (nếu bật) ─────────────────────
+    ml_adj = 0.0
+    ml_breakdown: dict = {}
+    if config.ML_ENABLED:
+        try:
+            from feature_pipeline import extract_features, extract_sequence
+            from ml_models import EnsembleScorer
+
+            feat_vec, feat_dict = extract_features(df, wave=signal.wave, signal=signal)
+            seq = extract_sequence(df, wave=signal.wave) if len(df) >= config.ML_FEATURE_WINDOW + 30 else None
+
+            scorer = EnsembleScorer()
+            scorer.load_all()
+            ml_prob, ml_breakdown = scorer.score(feat_vec, feat_dict, seq)
+
+            # Blend ML prob with heuristic: ML provides an adjustment
+            # ML prob 0.5 = neutral (no change), >0.5 = positive, <0.5 = negative
+            ml_adj = (ml_prob - 0.5) * 0.20   # Max ±10% adjustment
+        except Exception as exc:
+            pass
+
     # ── Tổng hợp xác suất ────────────────────────────────────────
-    win_prob   = float(np.clip(base_win_prob + wave_boost + history_adj + vol_adj, 0.40, 0.80))
+    win_prob = float(np.clip(
+        base_win_prob + wave_boost + history_adj + vol_adj + ml_adj,
+        0.40, 0.82
+    ))
 
     # ── Mức tự tin ───────────────────────────────────────────────
-    # Kết hợp: khoảng cách từ 0.5 (uncertainty floor) + điểm tín hiệu
     confidence = float(np.clip(
         (win_prob - 0.40) / 0.35 * (base_score / 100.0),
         0.0, 1.0,
@@ -178,10 +200,11 @@ def predict(
         and confidence >= config.PREDICT_MIN_CONFIDENCE
     )
 
+    ml_info = f"  ml_adj={ml_adj:+.3f}({ml_breakdown.get('ensemble_prob', 'N/A')})" if ml_breakdown else ""
     reason = (
         f"win_prob={win_prob:.3f}  conf={confidence:.3f}  "
         f"score={base_score}  wave={wave_boost:+.3f}  "
-        f"hist={history_adj:+.3f}  vol={vol_adj:+.3f}"
+        f"hist={history_adj:+.3f}  vol={vol_adj:+.3f}{ml_info}"
     )
 
     return Prediction(
