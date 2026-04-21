@@ -5,11 +5,16 @@
 # 1. Đăng nhập tài khoản Deriv tại https://app.deriv.com
 # 2. Vào Settings > API Token
 # 3. Tạo token với quyền "Trade" và "Read"
-# 4. Dán token vào biến DERIV_API_TOKEN bên dưới
+# 4. Dán token vào biến DERIV_API_TOKEN trong file .env
 # ============================================================
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # --- Deriv API ---
-DERIV_API_TOKEN = "YOUR_DERIV_API_TOKEN"   # Thay bằng API token thực
+DERIV_API_TOKEN = os.getenv("DERIV_API_TOKEN", "")  # Đặt trong .env
 DERIV_APP_ID    = 1089                     # App ID mặc định (demo). Tạo app tại https://api.deriv.com/app-registration
 DERIV_WS_URL    = f"wss://ws.binaryws.com/websockets/v3?app_id={DERIV_APP_ID}"
 
@@ -34,9 +39,15 @@ TRADE_CURRENCY     = "USD"
 CONTRACT_DURATION  = 5      # Thời hạn hợp đồng
 CONTRACT_DURATION_UNIT = "m"  # Đơn vị: t=giây, m=phút, h=giờ, d=ngày
 
+# --- Security ---
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "")   # Đặt trong .env
+
+# --- LLM ---
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")         # Đặt trong .env
+
 # --- Redis ---
-REDIS_HOST    = "localhost"
-REDIS_PORT    = 6379
+REDIS_HOST    = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT    = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB      = 0
 REDIS_HASH_KEY = "Deriv_Binary_Signal"
 
@@ -71,6 +82,8 @@ STAKE_MAX_USD    = 50.0   # Lệnh tối đa (USD)
 # --- Redis keys cho trạng thái tự vận hành ---
 REDIS_STATE_KEY   = "Deriv_Robot_State"    # Hash: trạng thái rủi ro
 REDIS_LOG_KEY     = "Deriv_Trade_Log"      # List: lịch sử lệnh (JSON)
+ENGINE_MODE_KEY   = "Deriv_EngineMode"     # String: chế độ vận hành của engine
+ACTIVE_SYMBOLS_KEY = "Deriv_ActiveSymbols" # Set/List: danh sách symbol đang kích hoạt
 
 # --- File log giao dịch ---
 TRADE_LOG_FILE = "trade_log.csv"

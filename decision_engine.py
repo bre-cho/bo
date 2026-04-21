@@ -60,8 +60,8 @@ class SystemMode(str, Enum):
     LEARNING = "LEARNING"
 
 
-_REDIS_MODE_KEY       = "Deriv_System_Mode"
-_REDIS_SCALE_KEY      = "Deriv_Active_Symbols"
+_REDIS_MODE_KEY       = "Deriv_EngineMode"
+_REDIS_SCALE_KEY      = "Deriv_ActiveSymbols"
 _PAPER_LOG_KEY        = "Deriv_Paper_Log"
 _MAX_CONSECUTIVE_ERRS = 5   # Lỗi liên tiếp trước khi self-heal
 
