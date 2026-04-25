@@ -1,0 +1,33 @@
+OPERATOR_MANIFEST = {
+    "system_id": "BO_AI_OPERATOR_SYSTEM",
+    "version": "1.0.0",
+    "source_inspiration": "forex-main AI_SYSTEM_FULL runtime patch",
+    "core_law": {
+        "VALID": "ALLOW",
+        "INVALID": "BLOCK",
+        "UNCERTAIN": "SKIP",
+        "DANGER": "KILL_SWITCH",
+        "DEFAULT": "DENY",
+    },
+    "execution_contract": [
+        "scan_signal",
+        "validate_market_data",
+        "validate_signal_quality",
+        "validate_predictor",
+        "validate_risk",
+        "validate_bo_specific_constraints",
+        "permission_gate",
+        "execute_or_skip",
+        "record_outcome",
+        "update_memory",
+    ],
+    "bo_specific_guards": [
+        "min_payout",
+        "expiry_alignment",
+        "stale_candle_block",
+        "duplicate_symbol_block",
+        "daily_loss_kill_switch",
+        "consecutive_loss_cooldown",
+        "broker_health_guard",
+    ],
+}

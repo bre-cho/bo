@@ -509,6 +509,35 @@ class Orchestrator:
             f"({', '.join(passed)})"
         )
 
+        # BO Governance Guard — AI_SYSTEM_FULL runtime protection
+        try:
+            from bo_governance import BOExecutionGuard
+            bo_guard = BOExecutionGuard()
+            verdict = bo_guard.validate_trade(
+                trade=trade,
+                balance=balance,
+                daily_pnl=0.0,  # optional: inject từ RiskManager ở patch nâng cao
+                risk_can_trade=risk_can_trade,
+                broker_ok=True,
+            )
+            if not verdict.allowed:
+                print(f"  [BOGuard] 🚫 {verdict.action}: {', '.join(verdict.reasons)}")
+                self._metrics.record_rejection(f"bo_guard:{verdict.action}")
+                return TradeOutcome(
+                    symbol      = trade.symbol,
+                    direction   = trade.direction,
+                    score       = trade.score,
+                    won         = False,
+                    pnl         = 0.0,
+                    stake       = trade.stake,
+                    executed_at = time.time(),
+                    latency_ms  = 0.0,
+                    rejected_by = "bo_guard:" + ",".join(verdict.reasons),
+                )
+        except Exception as exc:
+            print(f"  [BOGuard] ⚠️ guard failed closed: {exc}")
+            return None
+
         execute_start = time.time()
         raw_result    = executor_fn(trade)
         latency_ms    = (time.time() - execute_start) * 1000

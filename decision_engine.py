@@ -35,6 +35,7 @@ from typing import Optional, Tuple
 import redis
 
 import config
+from ai_trading_brain import AITradingBrain, BrainContext
 from brain        import pick_best_entry
 from risk_manager import RiskManager
 from deriv_trade  import get_balance, place_and_wait, invalidate_balance_cache
@@ -97,8 +98,8 @@ class SystemMode(str, Enum):
     EVOLVING  = "EVOLVING"
 
 
-_REDIS_MODE_KEY       = "Deriv_System_Mode"
-_REDIS_SCALE_KEY      = "Deriv_Active_Symbols"
+_REDIS_MODE_KEY       = "Deriv_EngineMode"
+_REDIS_SCALE_KEY      = "Deriv_ActiveSymbols"
 _PAPER_LOG_KEY        = "Deriv_Paper_Log"
 _MAX_CONSECUTIVE_ERRS = 5   # Lỗi liên tiếp trước khi self-heal
 
@@ -128,6 +129,9 @@ class DecisionEngine:
 
         # Redis Memory Brain — bộ não trung tâm ghi nhớ Win/Loss
         self.memory = MemoryBrain()
+
+        # FULL AI TRADING BRAIN — Decision + Memory + Evolution + Governance
+        self.ai_brain = AITradingBrain(redis_client=self._r)
 
         # Pipeline components
         self._pipeline = Orchestrator(
@@ -353,7 +357,51 @@ class DecisionEngine:
         self._r.lpush(_PAPER_LOG_KEY, json.dumps(entry))
         self._r.ltrim(_PAPER_LOG_KEY, 0, 199)
 
-    # ── ④ tự hành động ───────────────────────────────────────────
+        # ── Paper trade milestone check ────────────────────────────
+        paper_count = self._r.llen(_PAPER_LOG_KEY)
+        paper_promote_min = getattr(config, "PAPER_PROMOTE_MIN_TRADES", 50)
+        paper_promote_max = getattr(config, "PAPER_PROMOTE_MAX_TRADES", 100)
+
+        if paper_count == paper_promote_min:
+            print(
+                f"\n  ⚠️  [PAPER] Đã đạt {paper_count} paper trades. "
+                f"Kiểm tra kết quả trước khi promote LIVE."
+            )
+            self._print_paper_summary()
+        elif paper_count >= paper_promote_max:
+            auto_promote = getattr(config, "PAPER_AUTO_PROMOTE", False)
+            if auto_promote:
+                print(f"\n  🚀 [PAPER→LIVE] Đủ {paper_count} trades — tự động chuyển LIVE.")
+                self._save_mode(SystemMode.LIVE)
+            else:
+                print(
+                    f"\n  ✅ [PAPER] Đã đủ {paper_count} paper trades. "
+                    f"Set PAPER_AUTO_PROMOTE=True hoặc gọi /engine/promote để bật LIVE."
+                )
+
+    def _print_paper_summary(self) -> None:
+        """In tóm tắt kết quả paper trading từ Redis log."""
+        raw_entries = self._r.lrange(_PAPER_LOG_KEY, 0, -1)
+        total = len(raw_entries)
+        if total == 0:
+            return
+        scores = []
+        dirs: dict[str, int] = {}
+        for raw in raw_entries:
+            try:
+                e = json.loads(raw)
+                scores.append(e.get("score", 0))
+                d = e.get("direction", "?")
+                dirs[d] = dirs.get(d, 0) + 1
+            except Exception:
+                pass
+        avg_score = sum(scores) / len(scores) if scores else 0
+        print(
+            f"  [PAPER SUMMARY] total={total}  avg_score={avg_score:.1f}  "
+            f"direction_dist={dirs}"
+        )
+
+
 
     def run_live_cycle(self, balance: float) -> None:
         """
@@ -421,6 +469,40 @@ class DecisionEngine:
                 confidence  = pred.confidence  if pred else 0.30
                 wave_active = bool(best.wave and best.wave.correction_active)
                 fib_zone    = best.wave.fib_zone if best.wave else "NONE"
+
+                # ── AI Trading Brain decision ─────────────────────
+                brain_ctx = BrainContext(
+                    symbol=best.symbol,
+                    direction=best.direction,
+                    signal_score=float(best.score),
+                    win_prob=float(win_prob),
+                    confidence=float(confidence),
+                    stake=float(stake),
+                    balance=float(balance),
+                    fib_zone=fib_zone,
+                    wave_active=wave_active,
+                    payout=getattr(config, "BO_DEFAULT_PAYOUT", 0.87),
+                    expiry_seconds=getattr(config, "BO_DEFAULT_EXPIRY_SECONDS", 60),
+                    market_regime=getattr(best, "market_regime", "UNKNOWN"),
+                    risk_allowed=allowed,
+                    risk_reason="OK",
+                )
+                brain_decision = self.ai_brain.decide(brain_ctx)
+
+                if brain_decision.action == "BLOCK":
+                    print(f"  [AIBrain] ❌ BLOCK score={brain_decision.final_score:.1f} {brain_decision.reasons}")
+                    return
+
+                if brain_decision.action == "SKIP":
+                    print(f"  [AIBrain] ⚠️ SKIP score={brain_decision.final_score:.1f} {brain_decision.reasons}")
+                    return
+
+                stake = round(stake * brain_decision.stake_multiplier, 2)
+                stake = max(config.STAKE_MIN_USD, min(config.STAKE_MAX_USD, stake))
+
+                # Gắn context vào signal để _execute_trade dùng record_outcome
+                setattr(best, "ai_brain_ctx", brain_ctx)
+                setattr(best, "ai_brain_decision", brain_decision)
 
                 # Áp dụng memory priority_boost vào priority score
                 priority = best.score * win_prob * confidence + verdict.priority_boost
@@ -530,6 +612,21 @@ class DecisionEngine:
         if features is not None:
             self.memory.record_outcome(features, won=won, pnl=pnl)
 
+        # ── AI Trading Brain — ghi nhận outcome ──────────────────
+        try:
+            brain_ctx      = getattr(signal, "ai_brain_ctx", None)
+            brain_decision = getattr(signal, "ai_brain_decision", None)
+            if brain_ctx is not None and brain_decision is not None:
+                self.ai_brain.record_outcome(
+                    ctx=brain_ctx,
+                    decision=brain_decision,
+                    won=won,
+                    pnl=pnl,
+                    stake=trade.stake,
+                )
+        except Exception as exc:
+            print(f"  [AIBrain] record_outcome failed: {exc}")
+
         # ── Cập nhật CapitalStrategyManager ──────────────────────
         if self.cap_strat is not None:
             try:
@@ -614,6 +711,11 @@ class DecisionEngine:
         finally:
             self._save_mode(prev_mode)
 
+        # AIBrain evolution sau mỗi 200 chu kỳ
+        if self._cycle_count > 0 and self._cycle_count % 200 == 0:
+            print("  [AIBrain] Evolution cycle...")
+            evo_result = self.ai_brain.evolve_once()
+            print(f"  [AIBrain] {evo_result.get('status')} {evo_result.get('reasons', '')}")
         # ── ML Model retrain (if enabled and enough data) ─────────
         if config.ML_ENABLED and self._cycle_count % config.ML_RETRAIN_INTERVAL == 0:
             try:
@@ -679,7 +781,6 @@ class DecisionEngine:
         evol_interval = getattr(config, "EVOL_AUTO_INTERVAL", 0)
         if evol_interval > 0 and self._cycle_count % evol_interval == 0:
             self.trigger_evolution()
-
     # ── ⑦ tự mô phỏng on-demand ──────────────────────────────────
 
     def run_simulation(self, symbol: str) -> None:
