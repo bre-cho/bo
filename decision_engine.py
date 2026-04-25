@@ -26,6 +26,7 @@ Bạn chỉ cần giám sát. Hệ thống tự quyết định tất cả.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime
 from enum import Enum
@@ -37,7 +38,7 @@ import config
 from ai_trading_brain import AITradingBrain, BrainContext
 from brain        import pick_best_entry
 from risk_manager import RiskManager
-from deriv_trade  import get_balance, place_and_wait
+from deriv_trade  import get_balance, place_and_wait, invalidate_balance_cache
 from logger       import TradeLogger, TradeRecord
 from learner      import Learner
 from predictor    import predict, Prediction
@@ -49,16 +50,52 @@ from pipeline     import (
 )
 import deriv_data
 
+# ── New components (lazy-loaded to avoid hard dependency) ─────────
+try:
+    from control_system     import ControlSystem
+    from capital_strategy   import CapitalStrategyManager
+    from candle_library     import CandleLibraryManager
+    from model_registry     import ModelRegistry
+    _HAS_NEW_COMPONENTS = True
+except ImportError as _e:
+    _HAS_NEW_COMPONENTS = False
+    print(f"[Engine] New components not available: {_e}")
+
+# ── Sovereign Oversight Layer (lazy-loaded) ────────────────────────
+try:
+    from sovereign_oversight import SovereignOversightLayer
+    _HAS_SSOL = True
+except ImportError as _e:
+    _HAS_SSOL = False
+    print(f"[Engine] Sovereign Oversight Layer not available: {_e}")
+
+# ── Empire Control Layer (lazy-loaded) ────────────────────────────
+try:
+    from empire_control import EmpireControlLayer
+    _HAS_EMPIRE = True
+except ImportError as _e:
+    _HAS_EMPIRE = False
+    print(f"[Engine] Empire Control Layer not available: {_e}")
+
+# ── Autonomous Evolution Engine (lazy-loaded) ──────────────────────
+try:
+    from autonomous_evolution import AutonomousEvolutionEngine
+    _HAS_AEE = True
+except ImportError as _e:
+    _HAS_AEE = False
+    print(f"[Engine] Autonomous Evolution Engine not available: {_e}")
+
 
 # ──────────────────────────────────────────────────────────────────
 # System state enum
 # ──────────────────────────────────────────────────────────────────
 
 class SystemMode(str, Enum):
-    LIVE     = "LIVE"
-    PAPER    = "PAPER"
-    PAUSED   = "PAUSED"
-    LEARNING = "LEARNING"
+    LIVE      = "LIVE"
+    PAPER     = "PAPER"
+    PAUSED    = "PAUSED"
+    LEARNING  = "LEARNING"
+    EVOLVING  = "EVOLVING"
 
 
 _REDIS_MODE_KEY       = "Deriv_EngineMode"
@@ -109,6 +146,72 @@ class DecisionEngine:
         self._mode               = self._load_mode()
         self._cycle_count        = 0
 
+        # Background-task lock: prevents SSOL/Empire/AEE from running concurrently
+        self._bg_lock    = threading.Lock()
+        self._bg_running = False
+
+        # ── New components ────────────────────────────────────────
+        if _HAS_NEW_COMPONENTS:
+            self.control      = ControlSystem()
+            self.cap_strat    = CapitalStrategyManager()
+            self.candle_lib   = CandleLibraryManager(self._active_symbols)
+            self.model_reg    = ModelRegistry()
+            self.candle_lib.load_all()  # Load cached libraries on startup
+        else:
+            self.control   = None
+            self.cap_strat = None
+            self.candle_lib= None
+            self.model_reg = None
+
+        # ── Sovereign Oversight Layer ─────────────────────────────
+        if _HAS_SSOL and getattr(config, "SSOL_ENABLED", True):
+            self._ssol = SovereignOversightLayer()
+        else:
+            self._ssol = None
+
+        # ── Empire Control Layer ───────────────────────────────────
+        if _HAS_EMPIRE and getattr(config, "EMPIRE_ENABLED", True):
+            self._empire = EmpireControlLayer()
+        else:
+            self._empire = None
+
+        # ── Autonomous Evolution Engine ────────────────────────────
+        if _HAS_AEE and getattr(config, "AEE_ENABLED", True):
+            self._aee = AutonomousEvolutionEngine()
+        else:
+            self._aee = None
+
+        # ── Cold-start synthetic training ─────────────────────────
+        if config.ML_ENABLED and config.SYNTH_COLD_START:
+            self._cold_start_synthetic_training()
+
+    # ── Cold-start synthetic training ────────────────────────────
+
+    def _cold_start_synthetic_training(self) -> None:
+        """
+        Chạy synthetic training ngay khi khởi động nếu chưa có models.
+        Đảm bảo model sẵn sàng trước lệnh đầu tiên.
+        """
+        import os as _os
+        model_file = _os.path.join(config.ML_MODELS_DIR, "win_classifier.pkl")
+        if _os.path.exists(model_file):
+            return  # Models already trained — skip cold start
+
+        print("\n  🏋️  [ColdStart] No models found — running synthetic pre-training...")
+        try:
+            from synthetic_engine import run_full_synthetic_training
+            metrics = run_full_synthetic_training()
+            if self.model_reg is not None:
+                self.model_reg.register(
+                    "win_classifier",
+                    n_train    = metrics["n_samples"],
+                    train_score= metrics["win_clf_auc"],
+                )
+            print(f"  🏋️  [ColdStart] Done: AUC={metrics['win_clf_auc']:.4f}  "
+                  f"n={metrics['n_samples']}  LSTM={'ok' if metrics['lstm_trained'] else 'skip'}")
+        except Exception as exc:
+            print(f"  🏋️  [ColdStart] Synthetic training failed: {exc}")
+
     # ── Persistence ───────────────────────────────────────────────
 
     def _load_mode(self) -> SystemMode:
@@ -145,12 +248,19 @@ class DecisionEngine:
         Quyết định hệ thống nên làm gì trong chu kỳ này.
 
         Ưu tiên:
-          PAUSED   : khi risk gate block giao dịch
+          PAUSED   : khi risk gate block giao dịch hoặc ControlSystem stop
           LEARNING : khi đủ history và đến kỳ học lại
           PAPER    : khi mode hiện tại là PAPER
           LIVE     : trạng thái bình thường
         """
-        # Kiểm tra risk gate trước
+        # Kiểm tra ControlSystem daily TP/SL trước
+        if self.control is not None:
+            ctrl_ok, ctrl_reason = self.control.can_trade(daily_pnl=self.risk.state.daily_pnl)
+            if not ctrl_ok:
+                print(f"  [ControlSystem] 🛑 {ctrl_reason}")
+                return SystemMode.PAUSED
+
+        # Kiểm tra risk gate
         allowed, _ = self.risk.can_trade(balance=balance)
         if not allowed:
             return SystemMode.PAUSED
@@ -342,9 +452,11 @@ class DecisionEngine:
                 # ② tự quyết định — tính win_prob + confidence
                 should_enter, pred = self.decide_entry(best, df, balance)
 
-                # Tính stake
+                # Tính stake — ưu tiên CapitalStrategyManager nếu có
                 if pred and pred.stake_suggestion > 0:
                     stake = pred.stake_suggestion
+                elif self.cap_strat is not None:
+                    stake = self.cap_strat.next_stake(balance, best.score)
                 else:
                     params = self.learner.get_params()
                     stake  = round(
@@ -515,6 +627,13 @@ class DecisionEngine:
         except Exception as exc:
             print(f"  [AIBrain] record_outcome failed: {exc}")
 
+        # ── Cập nhật CapitalStrategyManager ──────────────────────
+        if self.cap_strat is not None:
+            try:
+                self.cap_strat.update(won=won, pnl=pnl)
+            except Exception:
+                pass
+
         signal = trade.signal_ref
         record = TradeRecord(
             timestamp    = ts.isoformat(),
@@ -597,7 +716,71 @@ class DecisionEngine:
             print("  [AIBrain] Evolution cycle...")
             evo_result = self.ai_brain.evolve_once()
             print(f"  [AIBrain] {evo_result.get('status')} {evo_result.get('reasons', '')}")
+        # ── ML Model retrain (if enabled and enough data) ─────────
+        if config.ML_ENABLED and self._cycle_count % config.ML_RETRAIN_INTERVAL == 0:
+            try:
+                from ml_models import EnsembleScorer
+                from feature_pipeline import build_training_dataset
+                import json as _json
+                _window = getattr(config, "TRADE_LOG_WINDOW", 200)
+                raw_history   = self._r.lrange(config.REDIS_LOG_KEY, 0, _window - 1)
+                trade_history = [_json.loads(r) for r in raw_history]
+                # Use candle library if available, else fetch fresh
+                if self.candle_lib is not None:
+                    df = self.candle_lib.get(config.SYMBOL).get_dataframe()
+                else:
+                    df = deriv_data.fetch_candles(count=config.SIM_CANDLE_COUNT)
 
+                # Build real feature dataset
+                real_X, real_y = (None, None)
+                if df is not None and not df.empty:
+                    real_X, real_y = build_training_dataset(df)
+
+                n_real = len(real_X) if real_X is not None else 0
+
+                # ── Synthetic boost: kick in when real data insufficient ──
+                if config.SYNTH_AUTO_BOOST and n_real < config.ML_MIN_TRAIN_SAMPLES:
+                    print(
+                        f"  🏋️  [Synthetic] Real samples={n_real} < {config.ML_MIN_TRAIN_SAMPLES} "
+                        f"— activating synthetic boost..."
+                    )
+                    from synthetic_engine import run_full_synthetic_training
+                    synth_metrics = run_full_synthetic_training(
+                        real_df = df,
+                        real_X  = real_X if n_real > 0 else None,
+                        real_y  = real_y if n_real > 0 else None,
+                    )
+                    if self.model_reg is not None:
+                        self.model_reg.register(
+                            "win_classifier",
+                            n_train    = synth_metrics["n_samples"],
+                            train_score= synth_metrics["win_clf_auc"],
+                        )
+                    print(f"  🏋️  [Synthetic] Done: AUC={synth_metrics['win_clf_auc']:.4f}  "
+                          f"n={synth_metrics['n_samples']}")
+                elif df is not None and not df.empty:
+                    # Enough real data — use normal retrain + synth blend
+                    scorer = EnsembleScorer()
+                    scorer.retrain_all(df, trade_history)
+                    if self.model_reg is not None:
+                        try:
+                            actual_score = getattr(scorer.win_clf._model, 'cv_values_', None)
+                            if actual_score is not None:
+                                import numpy as _np
+                                train_score = float(_np.mean(actual_score))
+                            else:
+                                train_score = 0.0
+                        except Exception:
+                            train_score = 0.0
+                        self.model_reg.register("win_classifier", n_train=len(trade_history), train_score=train_score)
+                    print(f"  🤖 [ML] Retrain complete ({len(trade_history)} trade samples)")
+            except Exception as exc:
+                print(f"  🤖 [ML] Retrain failed: {exc}")
+
+        # ── Evolution cycle (if enabled and interval reached) ─────
+        evol_interval = getattr(config, "EVOL_AUTO_INTERVAL", 0)
+        if evol_interval > 0 and self._cycle_count % evol_interval == 0:
+            self.trigger_evolution()
     # ── ⑦ tự mô phỏng on-demand ──────────────────────────────────
 
     def run_simulation(self, symbol: str) -> None:
@@ -614,6 +797,53 @@ class DecisionEngine:
             )
         except Exception as exc:
             print(f"  🔬 [Sim] Lỗi backtest {symbol}: {exc}")
+
+    # ── ⑧ tự tiến hóa ────────────────────────────────────────────
+
+    def trigger_evolution(
+        self,
+        generations: int = None,
+        pop_size   : int = None,
+        n_envs     : int = None,
+    ) -> None:
+        """
+        Chạy một chu kỳ tiến hóa (Self-Play + Genetic Algorithm).
+
+        Quy trình:
+          1. Sinh quần thể chiến lược (genomes)
+          2. Cho cạnh tranh trong đấu trường môi trường đa dạng
+          3. Chọn kẻ thắng, lai ghép + đột biến → thế hệ mới
+          4. Lặp lại N thế hệ
+          5. Thăng chức champion lên Redis → áp dụng ngay vào engine
+
+        Kết quả:
+          - config.MIN_SIGNAL_SCORE cập nhật theo champion
+          - config.RSI_OVERSOLD / RSI_OVERBOUGHT cập nhật
+          - Genome tốt nhất lưu vào Redis + file models/champion_genome.json
+        """
+        prev_mode = self._mode
+        self._save_mode(SystemMode.EVOLVING)
+        try:
+            from evolution_engine import run_evolution_cycle, apply_champion_to_config
+            print(f"\n  🧬 [Evolution] Starting self-play evolution cycle...")
+            champion = run_evolution_cycle(
+                generations = generations or config.EVOL_GENERATIONS,
+                pop_size    = pop_size    or config.EVOL_POP_SIZE,
+                n_envs      = n_envs      or config.EVOL_N_ENVIRONMENTS,
+                verbose     = True,
+            )
+            if config.EVOL_AUTO_PROMOTE and champion.fitness > 0.01:
+                apply_champion_to_config()
+                print(
+                    f"  🧬 [Evolution] Champion applied: "
+                    f"min_score={config.MIN_SIGNAL_SCORE:.1f}  "
+                    f"rsi_os={config.RSI_OVERSOLD:.1f}  "
+                    f"rsi_ob={config.RSI_OVERBOUGHT:.1f}"
+                )
+        except Exception as exc:
+            print(f"  🧬 [Evolution] Failed: {exc}")
+        finally:
+            self._save_mode(prev_mode)
 
     # ── ⑧ tự scale ───────────────────────────────────────────────
 
@@ -654,7 +884,156 @@ class DecisionEngine:
                 f"Pool ổn định ({len(current)} thị trường)"
             )
 
-    # ── Dashboard ─────────────────────────────────────────────────
+    # ── ⑨ sovereign oversight ─────────────────────────────────────
+
+    def trigger_sovereign_oversight(self) -> None:
+        """
+        Chạy một chu kỳ SSOL (Strategic Sovereign Oversight Layer).
+
+        Quy trình:
+          1. Thu thập telemetry per-cluster từ Redis
+          2. Chấm điểm + xác định phase mạng
+          3. Phân bổ attention/capital budget
+          4. Kiểm tra guardrails toàn mạng
+          5. Phát lệnh governor (scale/kill/quarantine/revive)
+          6. Cập nhật strategic memory
+          7. Lưu báo cáo vào Redis
+
+        Trong shadow mode (SSOL_SHADOW_MODE=True):
+          - Tính toán đầy đủ nhưng không thay đổi active_symbols
+          - Chỉ ghi log khuyến nghị → phase 2 của lộ trình triển khai
+
+        Trong enforce mode (SSOL_SHADOW_MODE=False):
+          - Verdicts được ghi Redis → active_symbols được lọc ngay
+          - phase 3-4 của lộ trình triển khai
+        """
+        if self._ssol is None:
+            return
+
+        print(f"\n  👑 [SSOL] Chạy sovereign oversight cycle #{self._cycle_count}...")
+        try:
+            report = self._ssol.run(
+                active_symbols=list(self._active_symbols),
+                verbose=True,
+            )
+
+            # Enforce mode: cập nhật active_symbols theo verdict của SSOL
+            if not getattr(config, "SSOL_SHADOW_MODE", True):
+                allowed = self._ssol.get_allowed_symbols(self._active_symbols)
+                if allowed != self._active_symbols:
+                    removed = set(self._active_symbols) - set(allowed)
+                    added   = set(allowed) - set(self._active_symbols)
+                    self._active_symbols = allowed
+                    self._save_active_symbols()
+                    if removed:
+                        print(f"  👑 [SSOL] 🗑️  Pool cập nhật: loại {removed}")
+                    if added:
+                        print(f"  👑 [SSOL] ➕ Pool cập nhật: thêm {added}")
+
+            print(
+                f"  👑 [SSOL] Phase={report.network_phase}  "
+                f"Health={report.network_health_score:.2f}  "
+                f"Active={report.n_clusters_active}/"
+                f"{report.n_clusters_total}  "
+                f"Alerts={len(report.guardrail_alerts)}"
+            )
+
+        except Exception as exc:
+            print(f"  👑 [SSOL] Lỗi: {exc}")
+
+    # ── ⑩ empire control ──────────────────────────────────────────
+
+    def trigger_empire_control(self) -> None:
+        """
+        Chạy một chu kỳ SSCL (Strategic Sovereign Control Layer).
+
+        Quy trình:
+          1. Thu thập telemetry per-cluster
+          2. Tính portfolio-theoretic attention allocation (Sharpe-based)
+          3. Tính Network Dominance Score
+          4. Phát hiện merge opportunities
+          5. Đánh giá empire objectives met/missed
+          6. Lưu báo cáo vào Redis
+
+        SSCL luôn chạy "advisory" — không tự modify active_symbols
+        (dùng SSOL cho enforcement). SSCL bổ sung portfolio intelligence.
+        """
+        if self._empire is None:
+            return
+
+        print(f"\n  🌐 [SSCL] Chạy empire control cycle #{self._cycle_count}...")
+        try:
+            report = self._empire.run(
+                active_symbols=list(self._active_symbols),
+                verbose=True,
+            )
+            print(
+                f"  🌐 [SSCL] Phase={report.empire_phase}  "
+                f"Dominance={report.dominance_score:.2f}  "
+                f"Entropy={report.attention_entropy:.2f}bits  "
+                f"Merges={len(report.merge_proposals)}"
+            )
+        except Exception as exc:
+            print(f"  🌐 [SSCL] Lỗi: {exc}")
+
+    # ── ⑪ autonomous evolution ────────────────────────────────────
+
+    def trigger_autonomous_evolution(self) -> None:
+        """
+        Chạy một chu kỳ AEE (Autonomous Evolution Engine).
+
+        Quy trình:
+          1. Phát hiện điểm yếu (WeaknessDetector)
+          2. Sinh hypothesis cải tiến (HypothesisGenerator)
+          3. Tạo mutations (MutationFactory)
+          4. Đánh giá mutations vs baseline (MutationEvaluator)
+          5. Kiểm tra an toàn (SafeEvolutionGate)
+          6. Apply mutations đã pass nếu AEE_DRY_RUN=False
+
+        Trong dry-run mode (AEE_DRY_RUN=True, default):
+          - Phát hiện + đánh giá nhưng không apply
+          - Báo cáo cho operator biết mutations nào sẽ được apply
+        """
+        if self._aee is None:
+            return
+
+        print(f"\n  🧬 [AEE] Chạy autonomous evolution cycle #{self._cycle_count}...")
+        try:
+            report = self._aee.run(
+                cycle_count=self._cycle_count,
+                verbose=True,
+            )
+            print(
+                f"  🧬 [AEE] Weaknesses={report.n_weaknesses}  "
+                f"Proposals={report.n_proposals}  "
+                f"Passed={report.n_passed}  "
+                f"Applied={len(report.applied_mutations)}  "
+                f"Safety={report.evolution_safety:.1%}"
+            )
+        except Exception as exc:
+            print(f"  🧬 [AEE] Lỗi: {exc}")
+
+    # ── Background task runner ────────────────────────────────────
+
+    def _run_in_background(self, target_fn) -> None:
+        """
+        Chạy target_fn trong thread nền (daemon).
+
+        Dùng _bg_lock để đảm bảo chỉ một heavy background task
+        (SSOL / Empire / AEE) chạy tại một thời điểm, tránh tranh chấp
+        Redis và tránh block vòng lặp chính.
+        """
+        def _wrapper():
+            if not self._bg_lock.acquire(blocking=False):
+                print("  ⏭️  [BG] Bỏ qua — background task khác đang chạy.")
+                return
+            try:
+                target_fn()
+            finally:
+                self._bg_lock.release()
+
+        t = threading.Thread(target=_wrapper, daemon=True)
+        t.start()
 
     def print_dashboard(self, balance: float, mode: SystemMode) -> None:
         """In dashboard giám sát cho operator."""
@@ -696,6 +1075,39 @@ class DecisionEngine:
             f"(block_threshold≥{config.MEMORY_HARD_BLOCK_LOSS_RATE*100:.0f}% loss  "
             f"min_samples={config.MEMORY_MIN_SAMPLES_FOR_RULE})"
         )
+        # Control System + Capital Strategy
+        if self.control is not None:
+            print(f"  Control  : {self.control.summary()}")
+        if self.cap_strat is not None:
+            cs = self.cap_strat.status()
+            print(
+                f"  CapStrat : {cs['strategy']}  base=${cs['base_stake']}  "
+                f"W-streak={cs['consecutive_win']}  L-streak={cs['consecutive_loss']}  "
+                f"PnL={cs['cycle_pnl']:+.2f}"
+            )
+        # Sovereign Oversight Layer summary
+        if self._ssol is not None:
+            ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
+            ssol_in = ssol_interval - (self._cycle_count % ssol_interval)
+            shadow  = "shadow" if getattr(config, "SSOL_SHADOW_MODE", True) else "enforce"
+            print(f"  SSOL👑   : mode={shadow}  next_in={ssol_in} cycles")
+        # Empire Control Layer summary
+        if self._empire is not None:
+            emp_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+            if emp_interval > 0:
+                emp_in = emp_interval - (self._cycle_count % emp_interval)
+                print(f"  SSCL🌐   : empire_control  next_in={emp_in} cycles")
+            else:
+                print(f"  SSCL🌐   : empire_control  (auto-run disabled)")
+        # Autonomous Evolution Engine summary
+        if self._aee is not None:
+            aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
+            dry_tag = "dry-run" if getattr(config, "AEE_DRY_RUN", True) else "live"
+            if aee_interval > 0:
+                aee_in = aee_interval - (self._cycle_count % aee_interval)
+                print(f"  AEE🧬    : mode={dry_tag}  next_in={aee_in} cycles")
+            else:
+                print(f"  AEE🧬    : mode={dry_tag}  (auto-run disabled)")
 
     # ── Master run loop ───────────────────────────────────────────
 
@@ -730,6 +1142,26 @@ class DecisionEngine:
             f"min_n={config.MEMORY_MIN_SAMPLES_FOR_RULE}  "
             f"rules={len(self.memory._hard_rules)}"
         )
+        ssol_status = "enabled" if self._ssol is not None else "disabled"
+        ssol_mode   = ("shadow" if getattr(config, "SSOL_SHADOW_MODE", True) else "enforce") if self._ssol else "n/a"
+        ssol_interval = getattr(config, "SSOL_CYCLE_INTERVAL", 50)
+        print(
+            f"  SSOL👑          : {ssol_status}  mode={ssol_mode}  "
+            f"interval={ssol_interval} cycles"
+        )
+        empire_status = "enabled" if self._empire is not None else "disabled"
+        empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+        print(
+            f"  SSCL🌐          : {empire_status}  "
+            f"interval={empire_interval} cycles"
+        )
+        aee_status = "enabled" if self._aee is not None else "disabled"
+        aee_mode   = ("dry-run" if getattr(config, "AEE_DRY_RUN", True) else "live") if self._aee else "n/a"
+        aee_interval = getattr(config, "AEE_CYCLE_INTERVAL", 200)
+        print(
+            f"  AEE🧬           : {aee_status}  mode={aee_mode}  "
+            f"interval={aee_interval} cycles"
+        )
         print("=" * 65)
 
         # Chạy simulation ban đầu trước khi vào vòng lặp
@@ -739,6 +1171,12 @@ class DecisionEngine:
                 self.run_simulation(sym)
 
         print(f"\n  [{datetime.now()}] Engine ONLINE. Nhấn Ctrl+C để dừng.\n")
+
+        # Đọc 1 lần trước vòng lặp thay vì getattr mỗi cycle
+        _ssol_interval   = getattr(config, "SSOL_CYCLE_INTERVAL",   50)
+        _empire_interval = getattr(config, "EMPIRE_CYCLE_INTERVAL", 100)
+        _aee_interval    = getattr(config, "AEE_CYCLE_INTERVAL",    200)
+        _stats_interval  = getattr(config, "STATS_PRINT_INTERVAL",    5)
 
         while True:
             try:
@@ -779,11 +1217,25 @@ class DecisionEngine:
                     if self._cycle_count % config.SCALE_INTERVAL_CYCLES == 0:
                         self.self_scale()
 
+                    # ⑨ sovereign oversight — chạy nền, không block cycle
+                    if _ssol_interval > 0 and self._cycle_count % _ssol_interval == 0:
+                        self._run_in_background(self.trigger_sovereign_oversight)
+
+                    # ⑩ empire control — chạy nền, không block cycle
+                    if _empire_interval > 0 and self._cycle_count % _empire_interval == 0:
+                        self._run_in_background(self.trigger_empire_control)
+
+                    # ⑪ autonomous evolution — chạy nền, không block cycle
+                    if _aee_interval > 0 and self._cycle_count % _aee_interval == 0:
+                        self._run_in_background(self.trigger_autonomous_evolution)
+
                     # ④ tự hành động — qua pipeline
                     self.run_live_cycle(balance=balance)
 
                 print(f"\n  {self.risk.summary()}")
-                self.logger.print_stats()
+                # In stats mỗi _stats_interval chu kỳ để giảm tải Redis
+                if _stats_interval <= 0 or self._cycle_count % _stats_interval == 0:
+                    self.logger.print_stats()
 
                 # In pipeline + memory report mỗi 10 chu kỳ
                 if self._cycle_count % 10 == 0:

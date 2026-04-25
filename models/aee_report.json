@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-04-18T10:20:00.109395",
+  "n_weaknesses": 0,
+  "n_proposals": 0,
+  "n_passed": 0,
+  "n_rejected": 0,
+  "n_blocked": 0,
+  "weaknesses": [],
+  "proposals": [],
+  "results": [],
+  "applied_mutations": [],
+  "evolution_safety": 1.0,
+  "insights": [
+    "Kh\u00f4ng ph\u00e1t hi\u1ec7n \u0111i\u1ec3m y\u1ebfu \u2014 h\u1ec7 th\u1ed1ng \u1ed5n \u0111\u1ecbnh"
+  ]
+}

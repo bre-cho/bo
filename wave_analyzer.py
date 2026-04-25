@@ -34,6 +34,13 @@ from typing import Optional
 import config
 
 
+# ── Module-level wave result cache ────────────────────────────────
+# Key: (cache_key, last_candle_datetime_str, n_rows)
+# Value: WaveContext
+# Giảm tính toán lặp lại khi nến chưa cập nhật trong cùng chu kỳ.
+_wave_cache: dict[tuple, "WaveContext"] = {}
+
+
 # ──────────────────────────────────────────────────────────────────
 # Dataclass kết quả phân tích sóng
 # ──────────────────────────────────────────────────────────────────
@@ -245,18 +252,29 @@ def _main_direction(swings: pd.DataFrame) -> str:
 # Hàm chính: phân tích toàn bộ sóng
 # ──────────────────────────────────────────────────────────────────
 
-def analyze_waves(df: pd.DataFrame) -> WaveContext:
+def analyze_waves(df: pd.DataFrame, cache_key: str = "") -> WaveContext:
     """
     Phân tích sóng chính và sóng hồi từ DataFrame nến.
 
     Parameters
     ----------
-    df : DataFrame với cột 'close' (và tùy chọn 'high', 'low')
+    df        : DataFrame với cột 'close' (và tùy chọn 'high', 'low')
+    cache_key : Chuỗi định danh symbol (ví dụ "R_100"). Khi cung cấp,
+                kết quả được cache theo (cache_key, last_datetime, n_rows)
+                để tránh tính lại khi nến chưa thay đổi.
 
     Returns
     -------
     WaveContext chứa đầy đủ thông tin sóng + khuyến nghị giao dịch
     """
+    # ── Cache lookup ──────────────────────────────────────────────
+    if cache_key:
+        last_dt = str(df["datetime"].iloc[-1]) if "datetime" in df.columns else str(df.index[-1])
+        _ck = (cache_key, last_dt, len(df))
+        cached = _wave_cache.get(_ck)
+        if cached is not None:
+            return cached
+
     close  = df["close"]
     price  = float(close.iloc[-1])
 
@@ -269,8 +287,16 @@ def analyze_waves(df: pd.DataFrame) -> WaveContext:
         at_support_resistance=False, entry_direction="NONE", entry_score=0,
         tp_price=price, sl_price=price, description="Không đủ dữ liệu sóng",
     )
+
+    def _cache_and_return(ctx: WaveContext) -> WaveContext:
+        if cache_key:
+            _wave_cache[_ck] = ctx
+            if len(_wave_cache) > 50:
+                del _wave_cache[next(iter(_wave_cache))]
+        return ctx
+
     if len(swings) < 4:
-        return _empty
+        return _cache_and_return(_empty)
 
     # ── 2. Xu hướng chính ─────────────────────────────────────────
     main_dir  = _main_direction(swings)
@@ -282,7 +308,7 @@ def analyze_waves(df: pd.DataFrame) -> WaveContext:
     lows_df  = swings[swings["type"] == "L"]
 
     if highs_df.empty or lows_df.empty:
-        return _empty
+        return _cache_and_return(_empty)
 
     swing_high = float(highs_df.iloc[-1]["price"])
     swing_low  = float(lows_df.iloc[-1]["price"])
@@ -290,7 +316,7 @@ def analyze_waves(df: pd.DataFrame) -> WaveContext:
     main_wave_size = swing_high - swing_low
     min_wave_size  = price * config.WAVE_MIN_SIZE_PCT
     if main_wave_size < min_wave_size:
-        return _empty
+        return _cache_and_return(_empty)
 
     # ── 3. Phát hiện sóng hồi ─────────────────────────────────────
     correction_active   = False
@@ -371,7 +397,7 @@ def analyze_waves(df: pd.DataFrame) -> WaveContext:
     else:
         desc = f"Xu hướng {main_dir} | Không có sóng hồi | Giá={price:.6f}"
 
-    return WaveContext(
+    result = WaveContext(
         main_direction       = main_dir,
         main_wave_size       = round(main_wave_size, 8),
         swing_high           = swing_high,
@@ -387,6 +413,16 @@ def analyze_waves(df: pd.DataFrame) -> WaveContext:
         description          = desc,
         sr_levels            = sr_levels,
     )
+
+    # ── Cache store ───────────────────────────────────────────────
+    if cache_key:
+        _wave_cache[_ck] = result
+        # Giữ cache nhỏ: xoá entry cũ khi vượt 50 phần tử
+        if len(_wave_cache) > 50:
+            oldest = next(iter(_wave_cache))
+            del _wave_cache[oldest]
+
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────

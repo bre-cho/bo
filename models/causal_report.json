@@ -1,0 +1,315 @@
+{
+  "pool_size": 90,
+  "n_evaluated": 90,
+  "causal_genes": [
+    "min_signal_score",
+    "min_wave_score",
+    "rsi_near_ob",
+    "lookahead_candles",
+    "rsi_overbought",
+    "rsi_oversold",
+    "wave_weight",
+    "macd_weight",
+    "rsi_near_os",
+    "rsi_weight",
+    "momentum_weight",
+    "bb_weight",
+    "bb_tight_threshold"
+  ],
+  "spurious_genes": [],
+  "neutral_genes": [],
+  "effects": [
+    {
+      "gene": "min_signal_score",
+      "simple_rho": -0.0646,
+      "partial_rho": -0.1368,
+      "causal_ace": -3.088376,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": -1.544188,
+      "low_val_effect": 1.544188,
+      "optimal_range": [
+        43.723,
+        54.15
+      ]
+    },
+    {
+      "gene": "min_wave_score",
+      "simple_rho": 0.2026,
+      "partial_rho": 0.1958,
+      "causal_ace": 3.071716,
+      "spurious_score": 0.0068,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 1.535858,
+      "low_val_effect": -1.535858,
+      "optimal_range": [
+        17.702,
+        26.805
+      ]
+    },
+    {
+      "gene": "rsi_near_ob",
+      "simple_rho": 0.2061,
+      "partial_rho": 0.1645,
+      "causal_ace": 1.657341,
+      "spurious_score": 0.0417,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.828671,
+      "low_val_effect": -0.828671,
+      "optimal_range": [
+        65.65,
+        69.527
+      ]
+    },
+    {
+      "gene": "lookahead_candles",
+      "simple_rho": -0.1297,
+      "partial_rho": -0.1824,
+      "causal_ace": -1.2312,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": -0.6156,
+      "low_val_effect": 0.6156,
+      "optimal_range": [
+        3.0,
+        7.0
+      ]
+    },
+    {
+      "gene": "rsi_overbought",
+      "simple_rho": 0.0314,
+      "partial_rho": -0.0601,
+      "causal_ace": -0.612113,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": -0.306057,
+      "low_val_effect": 0.306057,
+      "optimal_range": [
+        66.208,
+        69.205
+      ]
+    },
+    {
+      "gene": "rsi_oversold",
+      "simple_rho": -0.0108,
+      "partial_rho": 0.0365,
+      "causal_ace": 0.481028,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.240514,
+      "low_val_effect": -0.240514,
+      "optimal_range": [
+        31.599,
+        36.613
+      ]
+    },
+    {
+      "gene": "wave_weight",
+      "simple_rho": 0.2406,
+      "partial_rho": 0.1857,
+      "causal_ace": 0.305734,
+      "spurious_score": 0.0549,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.152867,
+      "low_val_effect": -0.152867,
+      "optimal_range": [
+        1.818,
+        2.81
+      ]
+    },
+    {
+      "gene": "macd_weight",
+      "simple_rho": 0.0766,
+      "partial_rho": 0.1524,
+      "causal_ace": 0.190554,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.095277,
+      "low_val_effect": -0.095277,
+      "optimal_range": [
+        1.724,
+        2.335
+      ]
+    },
+    {
+      "gene": "rsi_near_os",
+      "simple_rho": 0.0253,
+      "partial_rho": 0.0126,
+      "causal_ace": 0.131356,
+      "spurious_score": 0.0127,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.065678,
+      "low_val_effect": -0.065678,
+      "optimal_range": [
+        39.527,
+        46.465
+      ]
+    },
+    {
+      "gene": "rsi_weight",
+      "simple_rho": 0.0978,
+      "partial_rho": 0.1149,
+      "causal_ace": 0.127195,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.063598,
+      "low_val_effect": -0.063598,
+      "optimal_range": [
+        1.7,
+        2.326
+      ]
+    },
+    {
+      "gene": "momentum_weight",
+      "simple_rho": -0.1006,
+      "partial_rho": -0.0797,
+      "causal_ace": -0.112579,
+      "spurious_score": 0.0209,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": -0.05629,
+      "low_val_effect": 0.05629,
+      "optimal_range": [
+        0.414,
+        1.2
+      ]
+    },
+    {
+      "gene": "bb_weight",
+      "simple_rho": 0.1108,
+      "partial_rho": 0.049,
+      "causal_ace": 0.058983,
+      "spurious_score": 0.0619,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": 0.029491,
+      "low_val_effect": -0.029491,
+      "optimal_range": [
+        1.559,
+        2.185
+      ]
+    },
+    {
+      "gene": "bb_tight_threshold",
+      "simple_rho": -0.0113,
+      "partial_rho": -0.0192,
+      "causal_ace": -0.00251,
+      "spurious_score": 0.0,
+      "is_causal": true,
+      "is_spurious": false,
+      "regime_ace": {},
+      "regime_stable": 0.5,
+      "high_val_effect": -0.001255,
+      "low_val_effect": 0.001255,
+      "optimal_range": [
+        0.069,
+        0.13
+      ]
+    }
+  ],
+  "regime_fitness": [],
+  "world_model": {
+    "trend_up": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "trend_down": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "choppy": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "high_vol_choppy": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "crash": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "spike": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    },
+    "recovery": {
+      "trend_up": 0.1429,
+      "trend_down": 0.1429,
+      "choppy": 0.1429,
+      "high_vol_choppy": 0.1429,
+      "crash": 0.1429,
+      "spike": 0.1429,
+      "recovery": 0.1429
+    }
+  },
+  "counterfactuals": [],
+  "insights": [
+    "Gene nh\u00e2n qu\u1ea3 m\u1ea1nh nh\u1ea5t: min_signal_score (ACE=-3.0884, gi\u1ea3m gi\u00e1 tr\u1ecb \u2192 th\u1eafng nhi\u1ec1u h\u01a1n)"
+  ],
+  "timestamp": "2026-04-18T03:19:03.830797"
+}
