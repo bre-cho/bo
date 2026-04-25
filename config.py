@@ -227,3 +227,21 @@ REDIS_MEMORY_RULES_KEY       = "Deriv_Mem_Rules"
 
 # Redis key lưu tổng hợp thống kê memory (JSON)
 REDIS_MEMORY_STATS_KEY       = "Deriv_Mem_Stats"
+
+# ──────────────────────────────────────────────────────────────────
+# BO AI SYSTEM FULL GOVERNANCE PATCH
+# ──────────────────────────────────────────────────────────────────
+
+BO_MIN_GOVERNANCE_SCORE = 65
+BO_MIN_WIN_PROB = 0.58
+BO_MIN_CONFIDENCE = 0.55
+BO_MIN_PAYOUT = 0.75
+BO_MAX_CANDLE_AGE_SECONDS = 90
+BO_MIN_SAME_SYMBOL_GAP_SECONDS = 180
+BO_HARD_DAILY_LOSS_PCT = 0.08
+BO_GOVERNANCE_FAIL_CLOSED = True
+
+# Paper trading promotion thresholds
+PAPER_PROMOTE_MIN_TRADES = 50    # Cảnh báo tại mốc này
+PAPER_PROMOTE_MAX_TRADES = 100   # Tự động promote nếu PAPER_AUTO_PROMOTE=True
+PAPER_AUTO_PROMOTE       = False # Mặc định tắt — cần bật thủ công
