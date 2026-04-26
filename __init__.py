@@ -1,4 +1,3 @@
-from .brain import AITradingBrain
-from .models import BrainContext, BrainDecision, PolicyGenome, TradeMemoryEvent
+from .ai_trading_brain import AITradingBrain, BrainContext, BrainDecision, PolicyGenome, TradeMemoryEvent
 
 __all__ = ["AITradingBrain", "BrainContext", "BrainDecision", "PolicyGenome", "TradeMemoryEvent"]

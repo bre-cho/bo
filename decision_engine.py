@@ -451,85 +451,94 @@ class DecisionEngine:
             else:
                 # ② tự quyết định — tính win_prob + confidence
                 should_enter, pred = self.decide_entry(best, df, balance)
-
-                # Tính stake — ưu tiên CapitalStrategyManager nếu có
-                if pred and pred.stake_suggestion > 0:
-                    stake = pred.stake_suggestion
-                elif self.cap_strat is not None:
-                    stake = self.cap_strat.next_stake(balance, best.score)
-                else:
-                    params = self.learner.get_params()
-                    stake  = round(
-                        self.risk.compute_stake(best.score, balance) * params.stake_multiplier,
-                        2,
-                    )
-                    stake = max(config.STAKE_MIN_USD, min(config.STAKE_MAX_USD, stake))
-
-                win_prob    = pred.win_prob    if pred else 0.50
-                confidence  = pred.confidence  if pred else 0.30
-                wave_active = bool(best.wave and best.wave.correction_active)
-                fib_zone    = best.wave.fib_zone if best.wave else "NONE"
-
-                # ── AI Trading Brain decision ─────────────────────
-                brain_ctx = BrainContext(
-                    symbol=best.symbol,
-                    direction=best.direction,
-                    signal_score=float(best.score),
-                    win_prob=float(win_prob),
-                    confidence=float(confidence),
-                    stake=float(stake),
-                    balance=float(balance),
-                    fib_zone=fib_zone,
-                    wave_active=wave_active,
-                    payout=getattr(config, "BO_DEFAULT_PAYOUT", 0.87),
-                    expiry_seconds=getattr(config, "BO_DEFAULT_EXPIRY_SECONDS", 60),
-                    market_regime=getattr(best, "market_regime", "UNKNOWN"),
-                    risk_allowed=allowed,
-                    risk_reason="OK",
-                )
-                brain_decision = self.ai_brain.decide(brain_ctx)
-
-                if brain_decision.action == "BLOCK":
-                    print(f"  [AIBrain] ❌ BLOCK score={brain_decision.final_score:.1f} {brain_decision.reasons}")
-                    return
-
-                if brain_decision.action == "SKIP":
-                    print(f"  [AIBrain] ⚠️ SKIP score={brain_decision.final_score:.1f} {brain_decision.reasons}")
-                    return
-
-                stake = round(stake * brain_decision.stake_multiplier, 2)
-                stake = max(config.STAKE_MIN_USD, min(config.STAKE_MAX_USD, stake))
-
-                # Gắn context vào signal để _execute_trade dùng record_outcome
-                setattr(best, "ai_brain_ctx", brain_ctx)
-                setattr(best, "ai_brain_decision", brain_decision)
-
-                # Áp dụng memory priority_boost vào priority score
-                priority = best.score * win_prob * confidence + verdict.priority_boost
-
-                queued = QueuedTrade(
-                    priority       = priority,
-                    enqueued_at    = time.time(),
-                    symbol         = best.symbol,
-                    direction      = best.direction,
-                    score          = best.score,
-                    win_prob       = win_prob,
-                    confidence     = confidence,
-                    stake          = stake,
-                    wave_active    = wave_active,
-                    fib_zone       = fib_zone,
-                    signal_ref     = best,
-                    trade_features = trade_features,
-                )
-
-                submitted = self._pipeline.submit(queued)
-                if submitted:
-                    boost_str = f"  mem_boost={verdict.priority_boost:+.1f}" if verdict.priority_boost != 0 else ""
+                if not should_enter:
                     print(
-                        f"  [Queue] ✅ Thêm vào hàng đợi: {best.symbol} {best.direction}  "
-                        f"score={best.score:.0f}  wp={win_prob:.2f}  "
-                        f"priority={priority:.1f}{boost_str}"
+                        f"  [Engine] ⏭️  Bỏ qua {best.symbol} {best.direction} "
+                        "do predictor/learner không xác nhận vào lệnh."
                     )
+                else:
+                    allowed, risk_reason = self.risk.can_trade(
+                        balance=balance,
+                        direction=best.direction,
+                    )
+                    if not allowed:
+                        print(f"  [Risk] 🚫 {risk_reason}")
+                    else:
+                        # Tính stake — ưu tiên CapitalStrategyManager nếu có
+                        if pred and pred.stake_suggestion > 0:
+                            stake = pred.stake_suggestion
+                        elif self.cap_strat is not None:
+                            stake = self.cap_strat.next_stake(balance, best.score)
+                        else:
+                            params = self.learner.get_params()
+                            stake  = round(
+                                self.risk.compute_stake(best.score, balance) * params.stake_multiplier,
+                                2,
+                            )
+                            stake = max(config.STAKE_MIN_USD, min(config.STAKE_MAX_USD, stake))
+
+                        win_prob    = pred.win_prob    if pred else 0.50
+                        confidence  = pred.confidence  if pred else 0.30
+                        wave_active = bool(best.wave and best.wave.correction_active)
+                        fib_zone    = best.wave.fib_zone if best.wave else "NONE"
+
+                        # ── AI Trading Brain decision ─────────────────────
+                        brain_ctx = BrainContext(
+                            symbol=best.symbol,
+                            direction=best.direction,
+                            signal_score=float(best.score),
+                            win_prob=float(win_prob),
+                            confidence=float(confidence),
+                            stake=float(stake),
+                            balance=float(balance),
+                            fib_zone=fib_zone,
+                            wave_active=wave_active,
+                            payout=getattr(config, "BO_DEFAULT_PAYOUT", 0.87),
+                            expiry_seconds=getattr(config, "BO_DEFAULT_EXPIRY_SECONDS", 60),
+                            market_regime=getattr(best, "market_regime", "UNKNOWN"),
+                            risk_allowed=allowed,
+                            risk_reason=risk_reason,
+                        )
+                        brain_decision = self.ai_brain.decide(brain_ctx)
+
+                        if brain_decision.action == "BLOCK":
+                            print(f"  [AIBrain] ❌ BLOCK score={brain_decision.final_score:.1f} {brain_decision.reasons}")
+                        elif brain_decision.action == "SKIP":
+                            print(f"  [AIBrain] ⚠️ SKIP score={brain_decision.final_score:.1f} {brain_decision.reasons}")
+                        else:
+                            stake = round(stake * brain_decision.stake_multiplier, 2)
+                            stake = max(config.STAKE_MIN_USD, min(config.STAKE_MAX_USD, stake))
+
+                            # Gắn context vào signal để _execute_trade dùng record_outcome
+                            setattr(best, "ai_brain_ctx", brain_ctx)
+                            setattr(best, "ai_brain_decision", brain_decision)
+
+                            # Áp dụng memory priority_boost vào priority score
+                            priority = best.score * win_prob * confidence + verdict.priority_boost
+
+                            queued = QueuedTrade(
+                                priority       = priority,
+                                enqueued_at    = time.time(),
+                                symbol         = best.symbol,
+                                direction      = best.direction,
+                                score          = best.score,
+                                win_prob       = win_prob,
+                                confidence     = confidence,
+                                stake          = stake,
+                                wave_active    = wave_active,
+                                fib_zone       = fib_zone,
+                                signal_ref     = best,
+                                trade_features = trade_features,
+                            )
+
+                            submitted = self._pipeline.submit(queued)
+                            if submitted:
+                                boost_str = f"  mem_boost={verdict.priority_boost:+.1f}" if verdict.priority_boost != 0 else ""
+                                print(
+                                    f"  [Queue] ✅ Thêm vào hàng đợi: {best.symbol} {best.direction}  "
+                                    f"score={best.score:.0f}  wp={win_prob:.2f}  "
+                                    f"priority={priority:.1f}{boost_str}"
+                                )
         else:
             print("  ⏳ Không có tín hiệu đủ điều kiện.")
 
@@ -542,6 +551,7 @@ class DecisionEngine:
         outcome = self._pipeline.dispatch(
             balance        = balance,
             risk_can_trade = allowed,
+            daily_pnl      = self.risk.state.daily_pnl,
             executor_fn    = self._execute_trade,
             memory_brain   = self.memory,      # Gate 4 — memory hard veto
         )
@@ -573,9 +583,9 @@ class DecisionEngine:
         Returns dict kết quả hoặc None nếu thất bại.
         """
         ts = datetime.now()
+        signal = trade.signal_ref
 
         if trade.wave_active:
-            signal = trade.signal_ref
             wave   = signal.wave if signal else None
             print(
                 f"  [Execute] {trade.symbol} {trade.direction}  "
@@ -606,7 +616,6 @@ class DecisionEngine:
         # ── Ghi nhận kết quả vào Memory Brain (BẮT BUỘC) ─────────
         features = trade.trade_features
         if features is None:
-            signal   = trade.signal_ref
             features = MemoryBrain.features_from_signal(signal) if signal else None
 
         if features is not None:
@@ -634,7 +643,11 @@ class DecisionEngine:
             except Exception:
                 pass
 
-        signal = trade.signal_ref
+        indicators = dict(getattr(signal, "indicators", {}) or {})
+        indicators.setdefault("fib_zone", trade.fib_zone)
+        indicators.setdefault("correction", trade.wave_active)
+        indicators.setdefault("wave_active", trade.wave_active)
+
         record = TradeRecord(
             timestamp    = ts.isoformat(),
             symbol       = trade.symbol,
@@ -649,6 +662,7 @@ class DecisionEngine:
             momentum     = signal.momentum     if signal else 0.0,
             macd_hist    = signal.macd_hist    if signal else 0.0,
             bb_position  = signal.bb_position  if signal else 0.0,
+            indicators   = indicators,
         )
         self.logger.log(record)
         return result

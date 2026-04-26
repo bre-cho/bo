@@ -1,5 +1,5 @@
 /**
- * app.js — BO Trading Robot Dashboard
+ * app.js — Bảng điều khiển robot giao dịch BO
  */
 
 const API = '';   // Same origin — API server serves the frontend
@@ -104,7 +104,7 @@ async function loadStats() {
 
   if (status) {
     // Engine badge
-    const mode = status.engine_mode || 'UNKNOWN';
+    const mode = status.engine_mode || 'KHÔNG_XÁC_ĐỊNH';
     const badge = document.getElementById('engine-badge');
     badge.textContent = mode;
     badge.className = `badge ${mode === 'LIVE' ? 'bg-success' : mode === 'PAPER' ? 'bg-warning text-dark' : mode === 'PAUSED' ? 'bg-secondary' : 'bg-info'}`;
@@ -128,11 +128,11 @@ async function loadStats() {
     }
     statusHtml += `
       <div class="d-flex flex-wrap gap-2">
-        <span class="badge bg-dark border border-secondary">Mode: ${mode}</span>
-        <span class="badge bg-dark border border-secondary">Wave: ${ctrl.wave_direction_filter || 'both'}</span>
-        <span class="badge bg-dark border border-secondary">TP: ${ctrl.daily_take_profit_usd > 0 ? '+$' + ctrl.daily_take_profit_usd : 'off'}</span>
-        <span class="badge bg-dark border border-secondary">SL: ${ctrl.daily_stop_loss_usd > 0 ? '-$' + ctrl.daily_stop_loss_usd : 'off'}</span>
-        <span class="badge bg-dark border border-secondary">Symbols: ${(status.active_symbols || []).join(', ')}</span>
+        <span class="badge bg-dark border border-secondary">Che do: ${mode}</span>
+        <span class="badge bg-dark border border-secondary">Song: ${ctrl.wave_direction_filter || 'both'}</span>
+        <span class="badge bg-dark border border-secondary">TP: ${ctrl.daily_take_profit_usd > 0 ? '+$' + ctrl.daily_take_profit_usd : 'tắt'}</span>
+        <span class="badge bg-dark border border-secondary">SL: ${ctrl.daily_stop_loss_usd > 0 ? '-$' + ctrl.daily_stop_loss_usd : 'tắt'}</span>
+        <span class="badge bg-dark border border-secondary">Ma: ${(status.active_symbols || []).join(', ')}</span>
       </div>`;
     setHtml('system-status-body', statusHtml);
 
@@ -140,18 +140,18 @@ async function loadStats() {
     let stratHtml = `
       <div class="d-flex flex-wrap gap-2">
         <span class="badge bg-primary">${cap.strategy || '--'}</span>
-        <span class="badge bg-dark border border-secondary">Base: $${cap.base_stake || 1}</span>
+        <span class="badge bg-dark border border-secondary">Moc: $${cap.base_stake || 1}</span>
         ${cap.row ? `<span class="badge bg-dark border border-secondary">Hàng ${cap.row} / Vị trí ${cap.pos}</span>` : ''}
-        ${cap.stake ? `<span class="badge bg-warning text-dark">Stake: $${cap.stake}</span>` : ''}
-        <span class="badge bg-dark border border-secondary">Win streak: ${cap.consecutive_win || 0}</span>
-        <span class="badge bg-dark border border-secondary">Loss streak: ${cap.consecutive_loss || 0}</span>
+        ${cap.stake ? `<span class="badge bg-warning text-dark">Tien lenh: $${cap.stake}</span>` : ''}
+        <span class="badge bg-dark border border-secondary">Chuoi thang: ${cap.consecutive_win || 0}</span>
+        <span class="badge bg-dark border border-secondary">Chuoi thua: ${cap.consecutive_loss || 0}</span>
       </div>`;
     setHtml('strategy-status-body', stratHtml);
     setHtml('strategy-current-status', stratHtml);
 
     // TP/SL displays
-    setText('tp-display', ctrl.daily_take_profit_usd > 0 ? '+$' + ctrl.daily_take_profit_usd : 'off');
-    setText('sl-display', ctrl.daily_stop_loss_usd > 0 ? '-$' + ctrl.daily_stop_loss_usd : 'off');
+    setText('tp-display', ctrl.daily_take_profit_usd > 0 ? '+$' + ctrl.daily_take_profit_usd : 'tắt');
+    setText('sl-display', ctrl.daily_stop_loss_usd > 0 ? '-$' + ctrl.daily_stop_loss_usd : 'tắt');
   }
 }
 
@@ -370,10 +370,10 @@ async function runSyntheticTrain() {
         Model đã lưu → dùng cho inference ngay lệnh tiếp theo.<br>
         Bật <code>ML_ENABLED=True</code> trong config.py để kích hoạt.
       </div>`;
-    showToast('Synthetic training hoàn thành!', 'success');
+    showToast('Huấn luyện tổng hợp đã hoàn thành!', 'success');
   } else {
-    body.innerHTML = `<div class="text-danger">Lỗi training. Kiểm tra console server.</div>`;
-    showToast('Lỗi synthetic training', 'danger');
+    body.innerHTML = `<div class="text-danger">Lỗi huấn luyện. Hãy kiểm tra nhật ký máy chủ.</div>`;
+    showToast('Lỗi huấn luyện tổng hợp', 'danger');
   }
 }
 
@@ -390,10 +390,10 @@ async function previewSyntheticData() {
     body.innerHTML = `
       <div class="d-flex flex-wrap gap-2 mb-2">
         <span class="badge bg-dark border border-secondary">Tổng: ${result.n_samples}</span>
-        <span class="badge bg-dark border border-secondary ${wrClass}">Win: ${result.win_rate_pct}%</span>
-        <span class="badge bg-dark border border-secondary">Features: ${result.n_features}</span>
-        <span class="badge bg-success bg-opacity-25">Win: ${result.n_wins}</span>
-        <span class="badge bg-danger bg-opacity-25">Loss: ${result.n_losses}</span>
+        <span class="badge bg-dark border border-secondary ${wrClass}">Thang: ${result.win_rate_pct}%</span>
+        <span class="badge bg-dark border border-secondary">Dac trung: ${result.n_features}</span>
+        <span class="badge bg-success bg-opacity-25">Thang: ${result.n_wins}</span>
+        <span class="badge bg-danger bg-opacity-25">Thua: ${result.n_losses}</span>
       </div>
       <div class="text-muted small">
         ${result.feature_names ? result.feature_names.slice(0, 10).join(', ') + '...' : ''}
@@ -431,10 +431,10 @@ async function runEvolution() {
 
   if (result && result.status === 'ok') {
     renderEvolutionChampion(result.champion);
-    showToast('Evolution hoàn thành! Champion đã được lưu.', 'success');
+    showToast('Tiến hóa đã hoàn tất! Genome vô địch đã được lưu.', 'success');
     await loadEvolutionStatus();
   } else {
-    showToast('Lỗi Evolution — kiểm tra console server', 'danger');
+    showToast('Lỗi tiến hóa — hãy kiểm tra nhật ký máy chủ', 'danger');
   }
 }
 
@@ -455,12 +455,12 @@ async function promoteChampion() {
   const result = await apiPost('/evolution/promote', {});
   if (result && result.applied) {
     showToast(
-      `Champion áp dụng! min_score=${result.min_signal_score?.toFixed(1)} ` +
+      `Đã áp dụng genome vô địch! min_score=${result.min_signal_score?.toFixed(1)} ` +
       `rsi_os=${result.rsi_oversold?.toFixed(1)}`, 'success'
     );
     await loadStats();
   } else {
-    showToast('Không có champion để áp dụng', 'warning');
+    showToast('Không có genome vô địch để áp dụng', 'warning');
   }
 }
 
@@ -477,11 +477,11 @@ function renderEvolutionChampion(c) {
 
   body.innerHTML = `
     <div class="d-flex flex-wrap gap-2 mb-3">
-      <span class="badge bg-success">Fitness: ${fitness}</span>
-      <span class="badge bg-info">Win Rate: ${wr}%</span>
+      <span class="badge bg-success">Do phu hop: ${fitness}</span>
+      <span class="badge bg-info">Ty le thang: ${wr}%</span>
       <span class="badge bg-primary">PF: ${pf}</span>
-      <span class="badge bg-secondary">Trades: ${c.n_trades || 0}</span>
-      <span class="badge bg-dark border border-secondary">Gen: ${c.generation || 0}</span>
+      <span class="badge bg-secondary">Lenh: ${c.n_trades || 0}</span>
+      <span class="badge bg-dark border border-secondary">The he: ${c.generation || 0}</span>
       <span class="badge bg-dark border border-secondary">#${c.genome_id || '?'}</span>
     </div>
     <div class="row g-2 small text-muted">
@@ -499,7 +499,7 @@ function renderEvolutionChampion(c) {
       </div>
       <div class="col-6 col-md-4">
         <div class="gene-card">
-          <div class="gene-label">rsi_oversold / overbought</div>
+          <div class="gene-label">rsi_qua_ban / qua_mua</div>
           <div class="gene-value text-success">${(c.rsi_oversold||30).toFixed(1)} / ${(c.rsi_overbought||70).toFixed(1)}</div>
         </div>
       </div>
@@ -628,22 +628,22 @@ function renderGTRecommendation(result) {
     <div class="d-flex justify-content-around mb-2">
       <div class="text-center">
         <div class="fs-4 fw-bold ${actionColor}">${action}</div>
-        <div class="text-muted small">Nash action</div>
+        <div class="text-muted small">Hành động Nash</div>
       </div>
       <div class="text-center">
         <div class="fs-5 fw-bold text-info">${nashPayoff.toFixed(4)}</div>
-        <div class="text-muted small">Nash payoff/trade</div>
+        <div class="text-muted small">Payoff Nash mỗi lệnh</div>
       </div>
     </div>
     <div class="d-flex gap-2 justify-content-center flex-wrap small">
       <span class="badge ${pressBadge} bg-opacity-25 text-light">
-        Platform pressure: ${pressure.toFixed(0)}%
+        Áp lực nền tảng: ${pressure.toFixed(0)}%
       </span>
       <span class="badge ${crowdBadge} bg-opacity-25 text-light">
-        Crowding: ${crowding.toFixed(0)}%
+        Mật độ cạnh tranh: ${crowding.toFixed(0)}%
       </span>
       <span class="badge bg-info bg-opacity-25 text-info">
-        Opponent: ${opp} (${conf.toFixed(0)}%)
+        Đối thủ: ${opp} (${conf.toFixed(0)}%)
       </span>
     </div>`;
 }
@@ -652,7 +652,7 @@ function renderGTNash(nashList) {
   const body = document.getElementById('gt-nash-body');
   if (!body) return;
   if (!nashList || !nashList.length) {
-    body.innerHTML = '<div class="text-muted small">No Nash equilibrium found</div>';
+    body.innerHTML = '<div class="text-muted small">Không tìm thấy cân bằng Nash</div>';
     return;
   }
 
@@ -716,7 +716,7 @@ function renderGTMatrix(result) {
         </tr>`).join('')}
       </tbody>
     </table>
-    <div class="text-muted small mt-1">Payoff per unit stake | green=win, red=lose</div>`;
+    <div class="text-muted small mt-1">Lợi ích trên mỗi đơn vị vốn | xanh=lãi, đỏ=lỗ</div>`;
 }
 
 function renderGTOpponent(beliefs) {
@@ -747,10 +747,10 @@ function renderGTOpponent(beliefs) {
   body.innerHTML = `
     <div class="mb-2">${typeBeliefRows}</div>
     <div class="d-flex justify-content-between small text-muted border-top border-secondary pt-2">
-      <span>Confidence: <strong class="text-info">${conc.toFixed(0)}%</strong></span>
-      <span>Observations: ${nObs}</span>
+      <span>Độ tin cậy: <strong class="text-info">${conc.toFixed(0)}%</strong></span>
+      <span>Số quan sát: ${nObs}</span>
     </div>
-    <div class="mt-1 small text-muted">Predicted next:
+    <div class="mt-1 small text-muted">Dự báo tiếp theo:
       <span class="text-success">CALL=${((predicted.CALL||0)*100).toFixed(0)}%</span>
       <span class="text-danger ms-2">PUT=${((predicted.PUT||0)*100).toFixed(0)}%</span>
       <span class="text-warning ms-2">SKIP=${((predicted.SKIP||0)*100).toFixed(0)}%</span>
@@ -791,8 +791,8 @@ function renderGTEXP3(exp3) {
   body.innerHTML = `
     ${['CALL','PUT','SKIP'].map(barFor).join('')}
     <div class="d-flex justify-content-between small text-muted border-top border-secondary pt-2 mt-1">
-      <span>Greedy: <strong class="text-info">${greedy}</strong></span>
-      <span>Rounds: ${rounds}</span>
+      <span>Hanh dong tham lam: <strong class="text-info">${greedy}</strong></span>
+      <span>Vong: ${rounds}</span>
     </div>
     <div class="small text-muted mt-1">
       Regret: ${regret.toFixed(1)} / bound ${bound.toFixed(0)}
@@ -813,7 +813,7 @@ function renderGTPressure(pa) {
   body.innerHTML = `
     <div class="mb-2">
       <div class="d-flex justify-content-between small mb-1">
-        <span class="text-muted">Pressure score</span>
+        <span class="text-muted">Diem ap luc</span>
         <span class="${score>50?'text-danger':score>20?'text-warning':'text-success'} fw-bold">${score.toFixed(0)}%</span>
       </div>
       <div class="progress bg-dark" style="height:10px">
@@ -859,19 +859,19 @@ function renderGTEcosystem(eco) {
       </div>
       <div class="col-3">
         <div class="fw-bold text-info">${nashDist.toFixed(3)}</div>
-        <div class="text-muted" style="font-size:0.7rem">Nash dist</div>
+        <div class="text-muted" style="font-size:0.7rem">Khoảng cách Nash</div>
       </div>
       <div class="col-3">
         <div class="fw-bold text-light">${((ours.win_rate||0)*100).toFixed(1)}%</div>
-        <div class="text-muted" style="font-size:0.7rem">Our WR</div>
+        <div class="text-muted" style="font-size:0.7rem">Ty le thang cua ta</div>
       </div>
     </div>
     <div class="mb-1">
-      <div class="text-muted" style="font-size:0.7rem">Crowding trend</div>
+      <div class="text-muted" style="font-size:0.7rem">Xu huong mat do canh tranh</div>
       ${sparkline(cwHist, '#ffc107')}
     </div>
     <div>
-      <div class="text-muted" style="font-size:0.7rem">Platform pressure trend</div>
+      <div class="text-muted" style="font-size:0.7rem">Xu huong ap luc nen tang</div>
       ${sparkline(prHist, '#dc3545')}
     </div>`;
 }
@@ -999,12 +999,12 @@ async function runUtilityOptimize() {
     document.getElementById('utility-temporal-card').style.display = '';
     document.getElementById('utility-causal-card').style.display   = '';
     showToast(
-      `Utility: optimal=${result.optimal_genome_id}  Kelly=${(result.kelly_stake*100).toFixed(1)}%`,
+      `Utility: toi uu=${result.optimal_genome_id}  Kelly=${(result.kelly_stake*100).toFixed(1)}%`,
       'info'
     );
     await loadParetoAnalysis();
   } else {
-    showToast('Utility optimization thất bại — chạy Evolution + Meta trước', 'warning');
+    showToast('Tối ưu utility thất bại — hãy chạy Tiến hóa + Meta trước', 'warning');
   }
 }
 
@@ -1064,18 +1064,18 @@ function renderUtilityOptimal(result) {
         <div class="text-info fw-bold">${gid}</div>
         <div class="text-muted small">
           Pareto front: <strong class="text-success">${front}</strong> genomes
-          &nbsp;|&nbsp; Pool: ${n_eval} evaluated
+          &nbsp;|&nbsp; Kho: ${n_eval} evaluated
         </div>
       </div>
       <div class="text-center">
         <div class="fs-5 text-warning fw-bold">${kelly.toFixed(1)}%</div>
-        <div class="text-muted small">Kelly stake</div>
+        <div class="text-muted small">Vốn Kelly</div>
       </div>
     </div>
-    ${barHtml('📈 Growth',    bd.growth    || 0, 'text-warning')}
-    ${barHtml('🛡️ Trust',    bd.trust     || 0, 'text-success')}
-    ${barHtml('⚡ Speed',     bd.speed     || 0, 'text-info')}
-    ${barHtml('🏔️ Stability',bd.stability || 0, 'text-secondary')}
+    ${barHtml('📈 Tang truong',    bd.growth    || 0, 'text-warning')}
+    ${barHtml('🛡️ Tin cay',    bd.trust     || 0, 'text-success')}
+    ${barHtml('⚡ Toc do',     bd.speed     || 0, 'text-info')}
+    ${barHtml('🏔️ On dinh',bd.stability || 0, 'text-secondary')}
     <div class="mt-2 text-center small text-muted">
       Weighted score: <strong class="text-light">${((bd.weighted||0)*100).toFixed(2)}%</strong>
       &nbsp;|&nbsp; Weights: g=${(w.growth||0)*100|0}% t=${(w.trust||0)*100|0}%
@@ -1140,7 +1140,7 @@ function renderUtilityTemporal(ta) {
 function renderUtilityCausal(alignment) {
   const body = document.getElementById('utility-causal-body');
   if (!body || !alignment || !Object.keys(alignment).length) {
-    if (body) body.innerHTML = '<div class="text-muted">Cần chạy Causal Analysis trước</div>';
+    if (body) body.innerHTML = '<div class="text-muted">Cần chạy phân tích nhân quả trước</div>';
     return;
   }
 
@@ -1157,8 +1157,8 @@ function renderUtilityCausal(alignment) {
         <span class="${axisColors[axis] || 'text-muted'}">${axis}</span>
         ${qualityBadge(data.alignment_quality)}
       </div>
-      ${data.causal_drivers?.length ? `<div class="text-success" style="font-size:0.7rem">Causal: ${data.causal_drivers.join(', ')}</div>` : ''}
-      ${data.spurious_present?.length ? `<div class="text-danger" style="font-size:0.7rem">Spurious: ${data.spurious_present.join(', ')}</div>` : ''}
+      ${data.causal_drivers?.length ? `<div class="text-success" style="font-size:0.7rem">Nhan qua: ${data.causal_drivers.join(', ')}</div>` : ''}
+      ${data.spurious_present?.length ? `<div class="text-danger" style="font-size:0.7rem">Gia tuong quan: ${data.spurious_present.join(', ')}</div>` : ''}
     </div>`
   ).join('');
 }
@@ -1183,7 +1183,7 @@ function renderUtilityKelly(breakdown, scores) {
   // Find the best genome's win_rate for Kelly curve display
   const best = (scores || [])[0];
   if (!best) {
-    body.innerHTML = '<div class="text-muted small">No data</div>';
+    body.innerHTML = '<div class="text-muted small">Khong co du lieu</div>';
     return;
   }
   const wr      = best.win_rate_pct || 55;
@@ -1198,7 +1198,7 @@ function renderUtilityKelly(breakdown, scores) {
       </div>
       <div class="col">
         <div class="fw-bold text-success">${(kelly*100).toFixed(1)}%</div>
-        <div class="text-muted" style="font-size:0.72rem">Kelly Stake</div>
+        <div class="text-muted" style="font-size:0.72rem">Vốn Kelly</div>
       </div>
       <div class="col">
         <div class="fw-bold text-info">${breakev.toFixed(1)}%</div>
@@ -1212,7 +1212,7 @@ function renderUtilityKelly(breakdown, scores) {
       &nbsp;→&nbsp; quarter = ${(kelly*100).toFixed(1)}%
     </div>
     <div class="text-muted small mt-1">
-      Quarter-Kelly bảo vệ tránh ruin trong chuỗi thua liên tiếp.
+      Kelly 1/4 bảo vệ tránh ruin trong chuỗi thua liên tiếp.
     </div>`;
 }
 
@@ -1277,7 +1277,7 @@ async function runCausalAnalyze() {
       neutral_genes : result.neutral_genes,
     });
     showToast(
-      `Causal: ${result.causal_genes.length} causal, ${result.spurious_genes.length} spurious genes`,
+      `Nhan qua: ${result.causal_genes.length} causal, ${result.spurious_genes.length} spurious genes`,
       'warning'
     );
     await loadCausalReport();
@@ -1410,7 +1410,7 @@ function renderCausalWorldModel(wm) {
       </div>`;
   }
   body.innerHTML = `
-    <div class="text-muted small mb-2">Top-2 likely next regimes:</div>
+    <div class="text-muted small mb-2">2 che do kha nang cao nhat tiep theo:</div>
     ${rows}`;
 }
 
@@ -1424,26 +1424,26 @@ function renderCausalSummary(stats) {
     <div class="d-flex flex-wrap gap-2 small">
       <div class="text-center p-2 border border-secondary rounded flex-fill">
         <div class="fs-5 text-light fw-bold">${stats.pool_size || 0}</div>
-        <div class="text-muted">Pool</div>
+        <div class="text-muted">Kho gene</div>
       </div>
       <div class="text-center p-2 border border-success rounded flex-fill">
         <div class="fs-5 text-success fw-bold">${(stats.causal_genes||[]).length}</div>
-        <div class="text-muted">Causal</div>
+        <div class="text-muted">Nhân quả</div>
       </div>
       <div class="text-center p-2 border border-danger rounded flex-fill">
         <div class="fs-5 text-danger fw-bold">${(stats.spurious_genes||[]).length}</div>
-        <div class="text-muted">Spurious</div>
+        <div class="text-muted">Giả tương quan</div>
       </div>
       <div class="text-center p-2 border border-secondary rounded flex-fill">
         <div class="fs-5 text-muted fw-bold">${(stats.neutral_genes||[]).length}</div>
-        <div class="text-muted">Neutral</div>
+        <div class="text-muted">Trung tính</div>
       </div>
     </div>
     ${(stats.causal_genes||[]).length ? `<div class="mt-2 small text-success">
-      Causal: ${(stats.causal_genes||[]).join(', ')}
+      Nhan qua: ${(stats.causal_genes||[]).join(', ')}
     </div>` : ''}
     ${(stats.spurious_genes||[]).length ? `<div class="mt-1 small text-danger">
-      Spurious: ${(stats.spurious_genes||[]).join(', ')}
+      Gia tuong quan: ${(stats.spurious_genes||[]).join(', ')}
     </div>` : ''}`;
 }
 
@@ -1475,7 +1475,7 @@ function renderCausalCFResult(cfs, nSurvived, regimeFrom, regimeTo) {
     <div class="mb-2 small text-muted">
       ${emojis[regimeFrom]||'?'} ${regimeFrom} → ${emojis[regimeTo]||'?'} ${regimeTo}:
       <strong class="${nSurvived > 0 ? 'text-success' : 'text-danger'}">${nSurvived}</strong>
-      / ${cfs.length} survived
+      / ${cfs.length} sống sót
     </div>
     ${survived.slice(0, 3).map(cf => `
       <div class="d-flex justify-content-between small mb-1 text-success">
@@ -1508,10 +1508,10 @@ async function runMetaBreed() {
     renderMetaInsights(result.insights);
     renderMetaSeeds(result.seeds);
     renderMetaPoolStats({ pool_size: result.pool_size, n_archetypes: result.n_archetypes });
-    showToast(`Meta breed: ${result.n_seeds} seeds từ pool ${result.pool_size} genomes`, 'info');
+    showToast(`Meta lai tạo: ${result.n_seeds} hạt giống từ kho ${result.pool_size} genome`, 'info');
     await loadMetaReport();
   } else {
-    showToast('Meta-Learning chưa đủ dữ liệu — chạy evolution trước', 'warning');
+    showToast('Meta-Learning chưa đủ dữ liệu — hãy chạy tiến hóa trước', 'warning');
   }
 }
 
@@ -1578,17 +1578,17 @@ function renderMetaPatterns(patterns) {
   card.style.display = '';
 
   const rows = Object.entries(patterns).map(([gene, p]) => {
-    const tightBadge = p.tight_range
-      ? '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.65rem">tight</span>'
-      : '<span class="badge bg-dark text-muted" style="font-size:0.65rem">loose</span>';
+    const hepBadge = p.hep_range
+      ? '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.65rem">hẹp</span>'
+      : '<span class="badge bg-dark text-muted" style="font-size:0.65rem">rộng</span>';
     const uniMark = p.is_universal ? ' ★' : '';
     return `
       <tr>
-        <td class="small ${p.tight_range ? 'text-warning' : 'text-muted'}">${gene}${uniMark}</td>
+        <td class="small ${p.hep_range ? 'text-warning' : 'text-muted'}">${gene}${uniMark}</td>
         <td class="small text-muted">${(p.low_pct||0).toFixed(2)}</td>
         <td class="small text-light">${(p.median||0).toFixed(2)}</td>
         <td class="small text-muted">${(p.high_pct||0).toFixed(2)}</td>
-        <td>${tightBadge}</td>
+        <td>${hepBadge}</td>
       </tr>`;
   });
   tbody.innerHTML = rows.join('');
@@ -1607,7 +1607,7 @@ function renderMetaArchetypes(archetypes) {
       <div class="archetype-card mb-2 border border-secondary rounded p-2">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <span class="badge ${color} bg-opacity-25 text-light">${arch.label || arch.archetype_id}</span>
-          <span class="text-muted small">${arch.n_members} members</span>
+          <span class="text-muted small">${arch.n_members} thành viên</span>
         </div>
         <div class="d-flex gap-2 small text-muted">
           <span>fit <strong class="text-light">${(arch.mean_fitness||0).toFixed(4)}</strong></span>
@@ -1648,11 +1648,11 @@ function renderMetaPoolStats(stats) {
     <div class="d-flex gap-3 small">
       <div class="text-center">
         <div class="fs-5 text-info fw-bold">${stats.pool_size || 0}</div>
-        <div class="text-muted">Genomes</div>
+        <div class="text-muted">Bộ gene</div>
       </div>
       <div class="text-center">
         <div class="fs-5 text-primary fw-bold">${stats.n_archetypes || 0}</div>
-        <div class="text-muted">Archetypes</div>
+        <div class="text-muted">Nguyên mẫu</div>
       </div>
     </div>`;
 }

@@ -15,7 +15,7 @@ import json
 import os
 import redis
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 import config
 
@@ -39,6 +39,7 @@ class TradeRecord:
     momentum:     float   = 0.0
     macd_hist:    float   = 0.0
     bb_position:  float   = 0.0
+    indicators:   dict    = field(default_factory=dict)
 
 
 # ------------------------------------------------------------------
@@ -48,7 +49,7 @@ class TradeRecord:
 _CSV_HEADER = [
     "timestamp", "symbol", "direction", "signal_score",
     "stake", "payout", "pnl", "won",
-    "contract_id", "rsi", "momentum", "macd_hist", "bb_position",
+    "contract_id", "rsi", "momentum", "macd_hist", "bb_position", "indicators",
 ]
 
 

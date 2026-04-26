@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .brain import AITradingBrain
+from ai_trading_brain import AITradingBrain
 
 router = APIRouter(prefix="/v1/ai-trading-brain", tags=["ai-trading-brain"])
 

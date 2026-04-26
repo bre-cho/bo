@@ -450,6 +450,7 @@ class Orchestrator:
         self,
         balance        : float,
         risk_can_trade : bool,
+        daily_pnl      : float,
         executor_fn    : Callable[[QueuedTrade], Optional[dict]],
         memory_brain   : Optional["MemoryBrain"] = None,
     ) -> Optional[TradeOutcome]:
@@ -460,6 +461,7 @@ class Orchestrator:
         ----------
         balance        : số dư tài khoản
         risk_can_trade : kết quả risk.can_trade()
+        daily_pnl      : P&L ngày hiện tại từ RiskManager
         executor_fn    : hàm thực thi lệnh (nhận QueuedTrade, trả về dict kết quả)
         memory_brain   : MemoryBrain để kiểm tra Gate 4 (hard veto)
 
@@ -516,7 +518,7 @@ class Orchestrator:
             verdict = bo_guard.validate_trade(
                 trade=trade,
                 balance=balance,
-                daily_pnl=0.0,  # optional: inject từ RiskManager ở patch nâng cao
+                daily_pnl=daily_pnl,
                 risk_can_trade=risk_can_trade,
                 broker_ok=True,
             )
