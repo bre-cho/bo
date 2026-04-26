@@ -1166,7 +1166,7 @@ def create_app():
 
     # ── AI Trading Brain router (optional) ────────────────────────
     try:
-        from ai_trading_brain.operator_api import router as _ai_brain_router
+        from operator_api import router as _ai_brain_router
         app.include_router(_ai_brain_router)
     except Exception:
         pass

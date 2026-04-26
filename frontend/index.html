@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BO Trading Robot — Dashboard</title>
+<title>Robot giao dịch BO — Bảng điều khiển</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -13,10 +13,10 @@
 <!-- Header -->
 <nav class="navbar navbar-dark bg-black border-bottom border-secondary px-4">
   <span class="navbar-brand fw-bold fs-5">
-    <i class="bi bi-robot text-success me-2"></i>BO Trading Robot
+    <i class="bi bi-robot text-success me-2"></i>Robot giao dịch BO
   </span>
   <div class="d-flex align-items-center gap-3">
-    <span id="engine-badge" class="badge bg-secondary">UNKNOWN</span>
+    <span id="engine-badge" class="badge bg-secondary">KHÔNG_XÁC_ĐỊNH</span>
     <span id="conn-dot" class="status-dot dot-gray"></span>
     <span id="conn-label" class="small text-muted">Đang kết nối...</span>
     <button class="btn btn-sm btn-outline-warning" onclick="togglePause()">
@@ -27,16 +27,16 @@
 
 <!-- Navigation tabs -->
 <ul class="nav nav-tabs nav-tabs-dark bg-black px-4 border-bottom border-secondary" id="mainTabs">
-  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-dashboard">📊 Dashboard</a></li>
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-dashboard">📊 Bảng điều khiển</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-strategy">💼 Chiến lược vốn</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-control">⚙️ Kiểm soát</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Synthetic Engine</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evolution">🧬 Evolution</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-meta">🔬 Meta-Genetics</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-causal">⚗️ Causal AI</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-utility">🎯 Utility AI</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-gametheory">🕹️ Game Theory</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 LLM Analyst</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-synthetic">🏋️ Động cơ dữ liệu tổng hợp</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evolution">🧬 Tiến hóa</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-meta">🔬 Siêu di truyền</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-causal">⚗️ AI nhân quả</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-utility">🎯 AI tối ưu</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-gametheory">🕹️ Lý thuyết trò chơi</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-llm">🤖 Nhà phân tích LLM</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-logs">📋 Lịch sử</a></li>
 </ul>
 
@@ -62,8 +62,8 @@
             <div class="text-muted small">P&amp;L hôm nay</div>
             <div class="fs-4 fw-bold" id="daily-pnl">--</div>
             <div class="text-muted small">
-              TP: <span id="tp-display">off</span> /
-              SL: <span id="sl-display">off</span>
+              TP: <span id="tp-display">tắt</span> /
+              SL: <span id="sl-display">tắt</span>
             </div>
           </div>
         </div>
@@ -82,7 +82,7 @@
           <div class="card-body">
             <div class="text-muted small">Tổng lệnh</div>
             <div class="fs-4 fw-bold text-warning" id="total-trades">--</div>
-            <div class="text-muted small">Profit Factor: <span id="pf">--</span></div>
+            <div class="text-muted small">Hệ số lợi nhuận: <span id="pf">--</span></div>
           </div>
         </div>
       </div>
@@ -121,8 +121,8 @@
           <table class="table table-dark table-hover table-sm mb-0">
             <thead class="table-secondary">
               <tr>
-                <th>Thời gian</th><th>Symbol</th><th>Hướng</th>
-                <th>Score</th><th>Stake</th><th>P&amp;L</th><th>Kết quả</th>
+                <th>Thời gian</th><th>Mã</th><th>Hướng</th>
+                <th>Điểm</th><th>Vốn lệnh</th><th>P&amp;L</th><th>Kết quả</th>
               </tr>
             </thead>
             <tbody id="recent-trades-body">
@@ -144,7 +144,7 @@
             <div class="mb-3">
               <label class="form-label text-muted">Tên chiến lược</label>
               <select class="form-select bg-dark text-light border-secondary" id="strategy-select" onchange="onStrategyChange()">
-                <option value="fixed_fractional">Fixed Fractional (% số dư)</option>
+                <option value="fixed_fractional">Cố định theo tỷ lệ (% số dư)</option>
                 <option value="martingale">Martingale (gấp đôi khi thua)</option>
                 <option value="anti_martingale">Anti-Martingale (tăng khi thắng)</option>
                 <option value="victor2">Victor 2 (2 chuỗi)</option>
@@ -153,7 +153,7 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label text-muted">Base Stake (USD)</label>
+              <label class="form-label text-muted">Vốn gốc mỗi lệnh (USD)</label>
               <input type="number" class="form-control bg-dark text-light border-secondary"
                      id="base-stake" value="1" min="0.5" step="0.5">
             </div>
@@ -162,7 +162,7 @@
                 <i class="bi bi-check-circle"></i> Áp dụng
               </button>
               <button class="btn btn-outline-warning" onclick="resetStrategy()">
-                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                <i class="bi bi-arrow-counterclockwise"></i> Đặt lại
               </button>
             </div>
           </div>
@@ -337,16 +337,16 @@
 
         <!-- Regime descriptions -->
         <div class="card card-dark mt-3">
-          <div class="card-header text-muted small">7 loại Regime được sinh</div>
+              <div class="card-header text-muted small">7 chế độ thị trường được sinh</div>
           <div class="card-body p-2">
             <div class="row g-2">
-              <div class="col-6"><div class="regime-badge bg-success bg-opacity-10 border border-success">↑ Trend UP</div></div>
-              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">↓ Trend DOWN</div></div>
-              <div class="col-6"><div class="regime-badge bg-secondary bg-opacity-10 border border-secondary">↔ Choppy</div></div>
-              <div class="col-6"><div class="regime-badge bg-warning bg-opacity-10 border border-warning">💥 Crash</div></div>
-              <div class="col-6"><div class="regime-badge bg-info bg-opacity-10 border border-info">🚀 Recovery</div></div>
-              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">🪤 False Breakout</div></div>
-              <div class="col-12"><div class="regime-badge bg-primary bg-opacity-10 border border-primary">🔀 Mixed (Markov chain)</div></div>
+              <div class="col-6"><div class="regime-badge bg-success bg-opacity-10 border border-success">↑ Xu hướng tăng</div></div>
+              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">↓ Xu hướng giảm</div></div>
+              <div class="col-6"><div class="regime-badge bg-secondary bg-opacity-10 border border-secondary">↔ Đi ngang</div></div>
+              <div class="col-6"><div class="regime-badge bg-warning bg-opacity-10 border border-warning">💥 Sụp mạnh</div></div>
+              <div class="col-6"><div class="regime-badge bg-info bg-opacity-10 border border-info">🚀 Phục hồi</div></div>
+              <div class="col-6"><div class="regime-badge bg-danger bg-opacity-10 border border-danger">🪤 Phá vỡ giả</div></div>
+              <div class="col-12"><div class="regime-badge bg-primary bg-opacity-10 border border-primary">🔀 Hỗn hợp (chuỗi Markov)</div></div>
             </div>
           </div>
         </div>
@@ -361,34 +361,34 @@
 
         <!-- Dataset preview -->
         <div class="card card-dark mt-3" id="synth-preview-card" style="display:none">
-          <div class="card-header text-muted small">Xem trước dataset</div>
+          <div class="card-header text-muted small">Xem trước tập dữ liệu</div>
           <div class="card-body" id="synth-preview-body"></div>
         </div>
 
         <!-- Augmentation info -->
         <div class="card card-dark mt-3">
-          <div class="card-header text-muted small">Kỹ thuật Augmentation</div>
+          <div class="card-header text-muted small">Kỹ thuật tăng cường dữ liệu</div>
           <div class="card-body p-2">
             <div class="small text-muted">
               <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-secondary">Gaussian Noise</span>
+                <span class="badge bg-secondary">Nhiễu Gauss</span>
                 <span>Thêm nhiễu nhỏ vào feature vector</span>
               </div>
               <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-secondary">Feature Dropout</span>
-                <span>Random zero 15% features</span>
+                <span class="badge bg-secondary">Rớt đặc trưng</span>
+                <span>Ngẫu nhiên đưa 15% đặc trưng về 0</span>
               </div>
               <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-secondary">Mixup</span>
-                <span>Blend 2 samples cùng class</span>
+                <span class="badge bg-secondary">Trộn mẫu</span>
+                <span>Trộn 2 mẫu cùng lớp</span>
               </div>
               <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-secondary">Cutout</span>
+                <span class="badge bg-secondary">Che đoạn</span>
                 <span>Zero dải features liên tiếp</span>
               </div>
               <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-secondary">Time Warp</span>
-                <span>Biến dạng time axis (LSTM)</span>
+                <span class="badge bg-secondary">Biến dạng thời gian</span>
+                <span>Biến dạng trục thời gian (LSTM)</span>
               </div>
             </div>
           </div>
@@ -404,11 +404,11 @@
       <!-- Left: controls -->
       <div class="col-md-5">
         <div class="card card-dark">
-          <div class="card-header">🧬 Self-Play Evolution Engine</div>
+          <div class="card-header">🧬 Động cơ tiến hóa tự đấu đối kháng</div>
           <div class="card-body">
             <p class="text-muted small mb-3">
               Hệ tự sinh chiến lược → cạnh tranh trong đấu trường → tiến hóa tự nhiên.<br>
-              <em>Genetic Algorithm trên không gian tham số giao dịch.</em>
+              <em>Thuật toán di truyền trên không gian tham số giao dịch.</em>
             </p>
 
             <div class="row g-2 mb-3">
@@ -474,7 +474,7 @@
               </div>
               <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-warning text-dark">Mutation</span>
-                <span>Gaussian perturbation + occasional large jump</span>
+                <span>Nhiễu Gauss + đôi khi nhảy lớn</span>
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-secondary">Diversity</span>
@@ -486,13 +486,13 @@
 
         <!-- Gene space -->
         <div class="card card-dark mt-3">
-          <div class="card-header text-muted small">Không gian gene (13 chiều)</div>
+          <div class="card-header text-muted small">Khong gian gene (13 chieu)</div>
           <div class="card-body p-2">
             <div class="small text-muted">
               <div class="mb-1"><strong class="text-light">RSI:</strong> oversold, overbought, near_os, near_ob</div>
-              <div class="mb-1"><strong class="text-light">Weights:</strong> rsi_w, momentum_w, macd_w, bb_w, wave_w</div>
+              <div class="mb-1"><strong class="text-light">Trọng số:</strong> rsi_w, momentum_w, macd_w, bb_w, wave_w</div>
               <div class="mb-1"><strong class="text-light">Filters:</strong> min_signal_score, min_wave_score, bb_threshold</div>
-              <div><strong class="text-light">Trade:</strong> lookahead_candles (2–15)</div>
+              <div><strong class="text-light">Giao dịch:</strong> lookahead_candles (2–15)</div>
             </div>
           </div>
         </div>
@@ -504,7 +504,7 @@
         <!-- Champion card -->
         <div class="card card-dark" id="evol-champion-card" style="display:none">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span>🏆 Champion Genome</span>
+            <span>🏆 Bộ gene vô địch</span>
             <button class="btn btn-sm btn-outline-success" onclick="promoteChampion()">
               <i class="bi bi-lightning-charge"></i> Áp dụng live
             </button>
@@ -520,10 +520,10 @@
               <table class="table table-dark table-sm mb-0" id="evol-history-table">
                 <thead class="sticky-top bg-dark">
                   <tr>
-                    <th>Gen</th>
-                    <th>Best Fitness</th>
-                    <th>Mean Fitness</th>
-                    <th>Win Rate</th>
+                    <th>Thế hệ</th>
+                    <th>Fitness tốt nhất</th>
+                    <th>Fitness trung bình</th>
+                    <th>Tỷ lệ thắng</th>
                     <th>PF</th>
                   </tr>
                 </thead>
@@ -538,16 +538,16 @@
           <div class="card-header text-muted small">10 loại môi trường đấu trường</div>
           <div class="card-body p-2">
             <div class="d-flex flex-wrap gap-1">
-              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑ Trend UP</span>
-              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑↑ Strong Trend UP</span>
-              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓ Trend DOWN</span>
-              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓↓ Strong Trend DOWN</span>
-              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔ Choppy</span>
-              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔↔ High Vol Choppy</span>
-              <span class="badge bg-warning bg-opacity-25 border border-warning text-warning">💥 Crash</span>
+              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑ Xu hướng tăng</span>
+              <span class="badge bg-success bg-opacity-25 border border-success text-success">↑↑ Xu hướng tăng mạnh</span>
+              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓ Xu hướng giảm</span>
+              <span class="badge bg-danger bg-opacity-25 border border-danger text-danger">↓↓ Xu hướng giảm mạnh</span>
+              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔ Đi ngang</span>
+              <span class="badge bg-secondary bg-opacity-25 border border-secondary">↔↔ Đi ngang biến động cao</span>
+              <span class="badge bg-warning bg-opacity-25 border border-warning text-warning">💥 Sụp mạnh</span>
               <span class="badge bg-info bg-opacity-25 border border-info text-info">🚀 Spike</span>
-              <span class="badge bg-info bg-opacity-25 border border-info text-info">🔄 Recovery</span>
-              <span class="badge bg-primary bg-opacity-25 border border-primary text-primary">🔀 Mixed Markov</span>
+              <span class="badge bg-info bg-opacity-25 border border-info text-info">🔄 Phục hồi</span>
+              <span class="badge bg-primary bg-opacity-25 border border-primary text-primary">🔀 Hỗn hợp Markov</span>
             </div>
           </div>
         </div>
@@ -563,14 +563,14 @@
       <!-- Left: controls + insights -->
       <div class="col-md-4">
         <div class="card card-dark">
-          <div class="card-header">🔬 Meta-Learning Analysis</div>
+          <div class="card-header">🔬 Phân tích học siêu cấp</div>
           <div class="card-body">
             <p class="text-muted small mb-3">
-              Học từ lịch sử winner: gene nào quan trọng, pattern nào lặp lại,
+              Học từ lịch sử chiến thắng: gene nào quan trọng, mẫu nào lặp lại,
               cách breed thế hệ tiếp theo thông minh hơn.
             </p>
             <div class="mb-3">
-              <label class="form-label text-muted small">Số seeds cần breed</label>
+              <label class="form-label text-muted small">Số hạt giống cần lai</label>
               <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
                      id="meta-n-seeds" value="12" min="4" max="50">
             </div>
@@ -587,14 +587,14 @@
                 <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
                      style="width: 100%"></div>
               </div>
-              <div class="text-muted small mt-1 text-center">Phân tích gene pool…</div>
+              <div class="text-muted small mt-1 text-center">Phân tích kho gene…</div>
             </div>
           </div>
         </div>
 
         <!-- Insights -->
         <div class="card card-dark mt-3" id="meta-insights-card" style="display:none">
-          <div class="card-header text-muted small">💡 Insights từ Meta-Learning</div>
+          <div class="card-header text-muted small">💡 Nhận định từ học siêu cấp</div>
           <div class="card-body p-2" id="meta-insights-body"></div>
         </div>
 
@@ -609,13 +609,13 @@
               <strong class="text-light">Mutual Info</strong> — phát hiện tương quan phi tuyến
             </div>
             <div class="mb-1">
-              <strong class="text-light">K-Means</strong> — cluster winners thành archetypes
+              <strong class="text-light">K-Means</strong> — gom cụm nhóm chiến thắng thành nguyên mẫu
             </div>
             <div class="mb-1">
-              <strong class="text-light">Guided Crossover</strong> — gene quan trọng → ưu tiên từ winner
+              <strong class="text-light">Lai ghép có hướng</strong> — gene quan trọng → ưu tiên từ nhóm thắng
             </div>
             <div>
-              <strong class="text-light">Attraction Force</strong> — kéo offspring về winner range
+              <strong class="text-light">Lực hút</strong> — kéo hậu duệ về vùng gene của nhóm thắng
             </div>
           </div>
         </div>
@@ -624,18 +624,18 @@
       <!-- Middle: gene importance + winner patterns -->
       <div class="col-md-4">
         <div class="card card-dark" id="meta-importance-card" style="display:none">
-          <div class="card-header text-muted small">📊 Gene Importance Ranking</div>
+          <div class="card-header text-muted small">📊 Xếp hạng độ quan trọng gene</div>
           <div class="card-body p-2" id="meta-importance-body"></div>
         </div>
 
         <div class="card card-dark mt-3" id="meta-patterns-card" style="display:none">
-          <div class="card-header text-muted small">🎯 Winner Gene Patterns (p10–p50–p90)</div>
+          <div class="card-header text-muted small">🎯 Mẫu gene chiến thắng (p10–p50–p90)</div>
           <div class="card-body p-0">
             <div class="table-responsive" style="max-height:280px;overflow-y:auto">
               <table class="table table-dark table-sm mb-0" id="meta-patterns-table">
                 <thead class="sticky-top bg-dark">
                   <tr>
-                    <th>Gene</th>
+                    <th>Tên gene</th>
                     <th>p10</th>
                     <th>Median</th>
                     <th>p90</th>
@@ -652,13 +652,13 @@
       <!-- Right: archetypes + bred seeds -->
       <div class="col-md-4">
         <div class="card card-dark" id="meta-archetypes-card" style="display:none">
-          <div class="card-header text-muted small">🧩 Strategy Archetypes</div>
+          <div class="card-header text-muted small">🧩 Nguyên mẫu chiến lược</div>
           <div class="card-body p-2" id="meta-archetypes-body"></div>
         </div>
 
         <div class="card card-dark mt-3" id="meta-seeds-card" style="display:none">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span class="small text-muted">🌱 Meta Seeds được Breed</span>
+            <span class="small text-muted">🌱 Hạt giống meta được lai tạo</span>
             <span class="badge bg-info" id="meta-seeds-count">0</span>
           </div>
           <div class="card-body p-0">
@@ -667,9 +667,9 @@
                 <thead class="sticky-top bg-dark">
                   <tr>
                     <th>#</th>
-                    <th>min_score</th>
-                    <th>wave_w</th>
-                    <th>lookahead</th>
+                    <th>Điểm tối thiểu</th>
+                    <th>Trọng số sóng</th>
+                    <th>Nhìn trước</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -678,9 +678,9 @@
           </div>
         </div>
 
-        <!-- Pool stats -->
+        <!-- Kho stats -->
         <div class="card card-dark mt-3" id="meta-pool-card" style="display:none">
-          <div class="card-header text-muted small">🗄️ Gene Pool Stats</div>
+          <div class="card-header text-muted small">🗄️ Thống kê kho gene</div>
           <div class="card-body" id="meta-pool-body"></div>
         </div>
       </div>
@@ -695,7 +695,7 @@
       <!-- Left: controls + insights -->
       <div class="col-md-3">
         <div class="card card-dark">
-          <div class="card-header">⚗️ Causal AI Analysis</div>
+          <div class="card-header">⚗️ Phân tích AI nhân quả</div>
           <div class="card-body">
             <p class="text-muted small mb-3">
               Học gene nào <em>thật sự gây ra</em> thắng lợi vs chỉ là
@@ -705,7 +705,7 @@
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="causal-fast-mode" checked>
                 <label class="form-check-label text-muted small" for="causal-fast-mode">
-                  Fast mode (partial correlation proxy)
+                  Che do nhanh (xap xi tuong quan tung phan)
                 </label>
               </div>
               <div class="text-muted" style="font-size:0.72rem;margin-top:4px">
@@ -734,7 +734,7 @@
 
         <!-- Insights -->
         <div class="card card-dark mt-3" id="causal-insights-card" style="display:none">
-          <div class="card-header text-muted small">💡 Causal Insights</div>
+          <div class="card-header text-muted small">💡 Nhận định nhân quả</div>
           <div class="card-body p-2" id="causal-insights-body"></div>
         </div>
 
@@ -742,11 +742,11 @@
         <div class="card card-dark mt-3">
           <div class="card-header text-muted small">Phương pháp</div>
           <div class="card-body p-2 small text-muted">
-            <div class="mb-1"><span class="text-warning">ACE</span> — Average Causal Effect: E[fitness|do(G=high)] − E[fitness|do(G=low)]</div>
-            <div class="mb-1"><span class="text-danger">Spurious</span> — |ρ_simple| >> |ρ_partial|: correlation giả do confounding</div>
-            <div class="mb-1"><span class="text-success">Causal</span> — |ACE| > threshold: gene thực sự điều khiển fitness</div>
-            <div class="mb-1"><span class="text-info">Robust</span> — Genome sống sót ≥70% regimes</div>
-            <div><span class="text-primary">WorldModel</span> — Xác suất chuyển regime: P(r_t+1|r_t)</div>
+            <div class="mb-1"><span class="text-warning">ACE</span> — Hiệu ứng nhân quả trung bình: E[fitness|do(G=high)] − E[fitness|do(G=low)]</div>
+            <div class="mb-1"><span class="text-danger">Giả tương quan</span> — |ρ_simple| >> |ρ_partial|: tương quan giả do nhiễu nền</div>
+            <div class="mb-1"><span class="text-success">Nhân quả</span> — |ACE| > ngưỡng: gene thật sự điều khiển fitness</div>
+            <div class="mb-1"><span class="text-info">Bền vững</span> — Bộ gene sống sót ≥70% chế độ</div>
+            <div><span class="text-primary">Mô hình thế giới</span> — Xác suất chuyển chế độ: P(r_t+1|r_t)</div>
           </div>
         </div>
       </div>
@@ -755,11 +755,11 @@
       <div class="col-md-5">
         <div class="card card-dark" id="causal-effects-card" style="display:none">
           <div class="card-header d-flex justify-content-between">
-            <span class="small text-muted">🔍 Gene: Causal vs Spurious</span>
+            <span class="small text-muted">🔍 Gene: Nhân quả vs Giả tương quan</span>
             <div class="d-flex gap-1 small">
-              <span class="badge bg-success bg-opacity-25 text-success">Causal</span>
-              <span class="badge bg-danger bg-opacity-25 text-danger">Spurious</span>
-              <span class="badge bg-secondary bg-opacity-25 text-secondary">Neutral</span>
+              <span class="badge bg-success bg-opacity-25 text-success">Nhân quả</span>
+              <span class="badge bg-danger bg-opacity-25 text-danger">Giả tương quan</span>
+              <span class="badge bg-secondary bg-opacity-25 text-secondary">Trung tính</span>
             </div>
           </div>
           <div class="card-body p-0">
@@ -767,12 +767,12 @@
               <table class="table table-dark table-sm mb-0" id="causal-effects-table">
                 <thead class="sticky-top bg-dark">
                   <tr>
-                    <th>Gene</th>
-                    <th title="Average Causal Effect">ACE</th>
+                    <th>Tên gene</th>
+                    <th title="Hiệu ứng nhân quả trung bình">ACE</th>
                     <th title="Simple Spearman ρ">ρ</th>
                     <th title="Partial ρ (controlling others)">partial ρ</th>
-                    <th title="Spurious score">Spur</th>
-                    <th>Optimal</th>
+                    <th title="Điểm giả tương quan">Giả</th>
+                    <th>Tối ưu</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -785,29 +785,29 @@
         <div class="card card-dark mt-3" id="causal-cf-card" style="display:none">
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-              <span class="small text-muted">🔮 Counterfactual: Nếu thị trường đổi…</span>
+              <span class="small text-muted">🔮 Phản thực: Nếu thị trường đổi…</span>
             </div>
           </div>
           <div class="card-body">
             <div class="d-flex gap-2 mb-3 align-items-center">
               <select id="cf-regime-from" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width:140px">
-                <option value="trend_up">📈 Trend Up</option>
-                <option value="trend_down">📉 Trend Down</option>
-                <option value="choppy">↔ Choppy</option>
-                <option value="high_vol_choppy">🌊 HV Choppy</option>
-                <option value="crash">💥 Crash</option>
+                <option value="trend_up">📈 Xu hướng tăng</option>
+                <option value="trend_down">📉 Xu hướng giảm</option>
+                <option value="choppy">↔ Đi ngang</option>
+                <option value="high_vol_choppy">🌊 Đi ngang biến động cao</option>
+                <option value="crash">💥 Sụp mạnh</option>
                 <option value="spike">🚀 Spike</option>
-                <option value="recovery">🔄 Recovery</option>
+                <option value="recovery">🔄 Phục hồi</option>
               </select>
               <span class="text-muted">→</span>
               <select id="cf-regime-to" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width:140px">
-                <option value="choppy">↔ Choppy</option>
-                <option value="trend_up">📈 Trend Up</option>
-                <option value="trend_down">📉 Trend Down</option>
-                <option value="high_vol_choppy">🌊 HV Choppy</option>
-                <option value="crash">💥 Crash</option>
+                <option value="choppy">↔ Đi ngang</option>
+                <option value="trend_up">📈 Xu hướng tăng</option>
+                <option value="trend_down">📉 Xu hướng giảm</option>
+                <option value="high_vol_choppy">🌊 Đi ngang biến động cao</option>
+                <option value="crash">💥 Sụp mạnh</option>
                 <option value="spike">🚀 Spike</option>
-                <option value="recovery">🔄 Recovery</option>
+                <option value="recovery">🔄 Phục hồi</option>
               </select>
               <button class="btn btn-sm btn-outline-info" onclick="queryCausalCounterfactual()">
                 <i class="bi bi-question-circle"></i>
@@ -821,16 +821,16 @@
       <!-- Right: Regime Fitness Heatmap + World Model -->
       <div class="col-md-4">
         <div class="card card-dark" id="causal-regime-card" style="display:none">
-          <div class="card-header text-muted small">🌐 Regime Fitness Map</div>
+          <div class="card-header text-muted small">🌐 Bản đồ fitness theo chế độ</div>
           <div class="card-body p-0">
             <div class="table-responsive" style="max-height:300px;overflow-y:auto">
               <table class="table table-dark table-sm mb-0" id="causal-regime-table">
                 <thead class="sticky-top bg-dark">
                   <tr>
-                    <th>Genome</th>
+                    <th>Bộ gene</th>
                     <th title="robust_score = mean/std">Robust</th>
-                    <th title="% regimes survived">Surv%</th>
-                    <th title="Best regime">Champion</th>
+                    <th title="% chế độ sống sót">Sống sót%</th>
+                    <th title="Chế độ tốt nhất">Vượt trội</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -841,7 +841,7 @@
 
         <!-- World Model: regime transition -->
         <div class="card card-dark mt-3" id="causal-wm-card" style="display:none">
-          <div class="card-header text-muted small">🗺️ World Model — Regime Transitions</div>
+          <div class="card-header text-muted small">🗺️ Mô hình thế giới — Chuyển chế độ</div>
           <div class="card-body p-2" id="causal-wm-body">
             <div class="text-muted small">
               P(next_regime | current_regime) — xác suất chuyển đổi chế độ thị trường
@@ -849,9 +849,9 @@
           </div>
         </div>
 
-        <!-- Pool stats + gene classification summary -->
+        <!-- Kho stats + gene classification summary -->
         <div class="card card-dark mt-3" id="causal-summary-card" style="display:none">
-          <div class="card-header text-muted small">📊 Gene Classification Summary</div>
+          <div class="card-header text-muted small">📊 Tổng kết phân loại gene</div>
           <div class="card-body" id="causal-summary-body"></div>
         </div>
       </div>
@@ -863,26 +863,26 @@
   <div class="tab-pane fade" id="tab-utility">
     <div class="row g-3">
 
-      <!-- Left: trade-off sliders + preset + controls -->
+      <!-- Left: trade-tat sliders + preset + controls -->
       <div class="col-md-3">
         <div class="card card-dark">
-          <div class="card-header">🎯 Utility Optimization</div>
+          <div class="card-header">🎯 Tối ưu tiện ích</div>
           <div class="card-body">
             <p class="text-muted small mb-3">
               Tối ưu chiến lược theo <em>utility dài hạn</em> — không chỉ win/loss.
-              Điều chỉnh trade-off giữa 4 trục giá trị.
+              Điều chỉnh trọng số đánh đổi giữa 4 trục giá trị.
             </p>
 
             <!-- Weight preset selector -->
             <div class="mb-3">
-              <label class="text-muted small">Preset Trade-off</label>
+              <label class="text-muted small">Mẫu trọng số đánh đổi</label>
               <select id="utility-preset" class="form-select form-select-sm bg-dark text-light border-secondary mt-1" onchange="applyUtilityPreset()">
-                <option value="balanced">⚖️ Balanced (25/25/25/25)</option>
-                <option value="aggressive">🚀 Aggressive (60/10/20/10)</option>
-                <option value="conservative">🛡️ Conservative (20/50/10/20)</option>
-                <option value="speed">⚡ Speed (20/10/60/10)</option>
-                <option value="stable">🏔️ Stable (20/30/10/40)</option>
-                <option value="custom">✏️ Custom</option>
+                <option value="balanced">⚖️ Can bang (25/25/25/25)</option>
+                <option value="aggressive">🚀 Tan cong (60/10/20/10)</option>
+                <option value="conservative">🛡️ Than trong (20/50/10/20)</option>
+                <option value="speed">⚡ Toc do (20/10/60/10)</option>
+                <option value="stable">🏔️ On dinh (20/30/10/40)</option>
+                <option value="custom">✏️ Tuy chinh</option>
               </select>
             </div>
 
@@ -890,28 +890,28 @@
             <div id="utility-sliders">
               <div class="mb-2">
                 <div class="d-flex justify-content-between small">
-                  <span class="text-warning">📈 Growth</span>
+                  <span class="text-warning">📈 Tang truong</span>
                   <span class="text-warning" id="val-growth">35%</span>
                 </div>
                 <input type="range" class="form-range" min="0" max="100" value="35" id="slider-growth" oninput="onUtilitySlider()">
               </div>
               <div class="mb-2">
                 <div class="d-flex justify-content-between small">
-                  <span class="text-success">🛡️ Trust</span>
+                  <span class="text-success">🛡️ Tin cay</span>
                   <span class="text-success" id="val-trust">30%</span>
                 </div>
                 <input type="range" class="form-range" min="0" max="100" value="30" id="slider-trust" oninput="onUtilitySlider()">
               </div>
               <div class="mb-2">
                 <div class="d-flex justify-content-between small">
-                  <span class="text-info">⚡ Speed</span>
+                  <span class="text-info">⚡ Toc do</span>
                   <span class="text-info" id="val-speed">20%</span>
                 </div>
                 <input type="range" class="form-range" min="0" max="100" value="20" id="slider-speed" oninput="onUtilitySlider()">
               </div>
               <div class="mb-2">
                 <div class="d-flex justify-content-between small">
-                  <span class="text-muted">🏔️ Stability</span>
+                  <span class="text-muted">🏔️ Ổn định</span>
                   <span class="text-muted" id="val-stability">15%</span>
                 </div>
                 <input type="range" class="form-range" min="0" max="100" value="15" id="slider-stability" oninput="onUtilitySlider()">
@@ -921,22 +921,22 @@
 
             <!-- Regime context -->
             <div class="mb-3 mt-2">
-              <label class="text-muted small">Current Regime (optional)</label>
+              <label class="text-muted small">Chế độ thị trường hiện tại (tùy chọn)</label>
               <select id="utility-regime" class="form-select form-select-sm bg-dark text-light border-secondary mt-1">
-                <option value="">🔍 Auto-detect</option>
-                <option value="trend_up">📈 Trend Up</option>
-                <option value="trend_down">📉 Trend Down</option>
-                <option value="choppy">↔ Choppy</option>
-                <option value="high_vol_choppy">🌊 HV Choppy</option>
-                <option value="crash">💥 Crash</option>
+                <option value="">🔍 Tự động nhận diện</option>
+                <option value="trend_up">📈 Xu hướng tăng</option>
+                <option value="trend_down">📉 Xu hướng giảm</option>
+                <option value="choppy">↔ Đi ngang</option>
+                <option value="high_vol_choppy">🌊 Đi ngang biến động cao</option>
+                <option value="crash">💥 Sụp mạnh</option>
                 <option value="spike">🚀 Spike</option>
-                <option value="recovery">🔄 Recovery</option>
+                <option value="recovery">🔄 Phục hồi</option>
               </select>
             </div>
 
             <div class="d-flex gap-2">
               <button class="btn btn-info flex-grow-1" onclick="runUtilityOptimize()" id="utility-run-btn">
-                <i class="bi bi-sliders"></i> Tối ưu Utility
+                <i class="bi bi-sliders"></i> Tối ưu tiện ích
               </button>
               <button class="btn btn-outline-secondary" onclick="loadUtilityReport()">
                 <i class="bi bi-arrow-repeat"></i>
@@ -953,7 +953,7 @@
 
         <!-- Insights -->
         <div class="card card-dark mt-3" id="utility-insights-card" style="display:none">
-          <div class="card-header text-muted small">💡 Decision Rationale</div>
+          <div class="card-header text-muted small">💡 Lý do ra quyết định</div>
           <div class="card-body p-2" id="utility-insights-body"></div>
         </div>
 
@@ -961,12 +961,12 @@
         <div class="card card-dark mt-3">
           <div class="card-header text-muted small">Lý thuyết</div>
           <div class="card-body p-2 small text-muted">
-            <div class="mb-1"><span class="text-warning">Growth</span> — Kelly log wealth: E[log(1+f·X)]</div>
-            <div class="mb-1"><span class="text-success">Trust</span> — Survivability × consistency qua regimes</div>
-            <div class="mb-1"><span class="text-info">Speed</span> — Trade frequency × excess win rate</div>
-            <div class="mb-1"><span class="text-secondary">Stability</span> — 1/(1+regime_sensitivity)</div>
-            <div class="mb-1"><span class="text-primary">Pareto</span> — Non-dominated: không ai tốt hơn trên mọi trục</div>
-            <div><span class="text-danger">Kelly</span> — f* = (p·b−q)/b; fractional Kelly ×0.25</div>
+            <div class="mb-1"><span class="text-warning">Tăng trưởng</span> — Kelly log wealth: E[log(1+f·X)]</div>
+            <div class="mb-1"><span class="text-success">Tin cậy</span> — Khả năng sống sót × nhất quán qua các chế độ</div>
+            <div class="mb-1"><span class="text-info">Tốc độ</span> — Tần suất giao dịch × tỷ lệ thắng vượt trội</div>
+            <div class="mb-1"><span class="text-secondary">Ổn định</span> — 1/(1+regime_sensitivity)</div>
+            <div class="mb-1"><span class="text-primary">Pareto</span> — Không trội hoàn toàn: không ai tốt hơn trên mọi trục</div>
+            <div><span class="text-danger">Kelly</span> — f* = (p·b−q)/b; Kelly phân đoạn ×0.25</div>
           </div>
         </div>
       </div>
@@ -976,14 +976,14 @@
 
         <!-- Optimal genome card -->
         <div class="card card-dark" id="utility-optimal-card" style="display:none">
-          <div class="card-header text-muted small">🏆 Optimal Genome</div>
+          <div class="card-header text-muted small">🏆 Bộ gene tối ưu</div>
           <div class="card-body" id="utility-optimal-body"></div>
         </div>
 
         <!-- Utility scores table -->
         <div class="card card-dark mt-3" id="utility-scores-card" style="display:none">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <span class="small text-muted">📊 Utility Scores (top genomes)</span>
+            <span class="small text-muted">📊 Điểm tiện ích (top bộ gene)</span>
             <span class="badge bg-info bg-opacity-25 text-info small">★ Pareto</span>
           </div>
           <div class="card-body p-0">
@@ -991,13 +991,13 @@
               <table class="table table-dark table-sm mb-0" id="utility-scores-table">
                 <thead class="sticky-top bg-dark">
                   <tr>
-                    <th>Genome</th>
-                    <th title="Growth utility">G</th>
-                    <th title="Trust utility">T</th>
-                    <th title="Speed utility">Sp</th>
-                    <th title="Stability utility">St</th>
-                    <th title="Weighted score">Score</th>
-                    <th title="Kelly fraction">Kelly%</th>
+                    <th>Bộ gene</th>
+                    <th title="Tang truong utility">G</th>
+                    <th title="Tin cay utility">T</th>
+                    <th title="Toc do utility">Sp</th>
+                    <th title="On dinh utility">St</th>
+                    <th title="Điểm trọng số">Điểm</th>
+                    <th title="Tỷ lệ Kelly">Kelly%</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -1008,7 +1008,7 @@
 
         <!-- Kelly growth curve -->
         <div class="card card-dark mt-3" id="utility-kelly-card" style="display:none">
-          <div class="card-header text-muted small">📐 Kelly Growth Curve</div>
+          <div class="card-header text-muted small">📐 Đường cong tăng trưởng Kelly</div>
           <div class="card-body p-2" id="utility-kelly-body"></div>
         </div>
       </div>
@@ -1019,7 +1019,7 @@
         <!-- Pareto analysis across presets -->
         <div class="card card-dark" id="utility-pareto-card" style="display:none">
           <div class="card-header d-flex justify-content-between">
-            <span class="text-muted small">🗺️ Pareto: Optimal per Preset</span>
+            <span class="text-muted small">🗺️ Pareto: Tối ưu theo từng bộ đặt trước</span>
             <button class="btn btn-xs btn-outline-secondary" style="font-size:0.7rem;padding:0 4px" onclick="loadParetoAnalysis()">↻</button>
           </div>
           <div class="card-body p-2" id="utility-pareto-body"></div>
@@ -1027,13 +1027,13 @@
 
         <!-- Temporal analysis -->
         <div class="card card-dark mt-3" id="utility-temporal-card" style="display:none">
-          <div class="card-header text-muted small">⏱️ Temporal Utility (Short/Med/Long)</div>
+          <div class="card-header text-muted small">⏱️ Tiện ích theo thời gian (Ngắn/Trung/Dài hạn)</div>
           <div class="card-body" id="utility-temporal-body"></div>
         </div>
 
         <!-- Causal alignment -->
         <div class="card card-dark mt-3" id="utility-causal-card" style="display:none">
-          <div class="card-header text-muted small">🔗 Causal Alignment</div>
+          <div class="card-header text-muted small">🔗 Can chinh nhan qua</div>
           <div class="card-body p-2 small" id="utility-causal-body"></div>
         </div>
       </div>
@@ -1045,40 +1045,40 @@
   <div class="tab-pane fade" id="tab-gametheory">
     <div class="row g-3">
 
-      <!-- Left: controls + payoff matrix + Nash -->
+      <!-- Left: controls + ma trận payoff + Nash -->
       <div class="col-md-3">
         <div class="card card-dark">
-          <div class="card-header">🕹️ Game Theory Engine</div>
+          <div class="card-header">🕹️ Động cơ lý thuyết trò chơi</div>
           <div class="card-body">
             <p class="text-muted small mb-3">
-              Tối ưu <em>trong môi trường có đối thủ</em> — Nash Equilibrium,
+              Tối ưu <em>trong môi trường có đối thủ</em> — cân bằng Nash,
               Bayesian opponent modeling, và EXP3 adversarial bandit.
             </p>
 
             <!-- Regime -->
             <div class="mb-3">
-              <label class="text-muted small">Market Regime</label>
+              <label class="text-muted small">Che do thi truong</label>
               <select id="gt-regime" class="form-select form-select-sm bg-dark text-light border-secondary mt-1">
-                <option value="">🔍 Auto</option>
-                <option value="trend_up">📈 Trend Up</option>
-                <option value="trend_down">📉 Trend Down</option>
-                <option value="choppy">↔ Choppy</option>
-                <option value="high_vol_choppy">🌊 HV Choppy</option>
-                <option value="crash">💥 Crash</option>
+                <option value="">🔍 Tự động</option>
+                <option value="trend_up">📈 Xu hướng tăng</option>
+                <option value="trend_down">📉 Xu hướng giảm</option>
+                <option value="choppy">↔ Đi ngang</option>
+                <option value="high_vol_choppy">🌊 Đi ngang biến động cao</option>
+                <option value="crash">💥 Sụp mạnh</option>
                 <option value="spike">🚀 Spike</option>
-                <option value="recovery">🔄 Recovery</option>
+                <option value="recovery">🔄 Phục hồi</option>
               </select>
             </div>
 
             <!-- Sim params -->
             <div class="row g-2 mb-3">
               <div class="col-6">
-                <label class="text-muted small">Rounds</label>
+                <label class="text-muted small">Số vòng</label>
                 <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
                        id="gt-rounds" value="100" min="20" max="500">
               </div>
               <div class="col-6">
-                <label class="text-muted small">Opponents</label>
+                <label class="text-muted small">Số đối thủ</label>
                 <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary"
                        id="gt-opponents" value="4" min="1" max="10">
               </div>
@@ -1103,13 +1103,13 @@
 
         <!-- Nash Equilibrium -->
         <div class="card card-dark mt-3" id="gt-nash-card" style="display:none">
-          <div class="card-header text-muted small">⚖️ Nash Equilibrium</div>
+          <div class="card-header text-muted small">⚖️ Cân bằng Nash</div>
           <div class="card-body p-2" id="gt-nash-body"></div>
         </div>
 
-        <!-- Payoff matrix -->
+        <!-- Paytat matrix -->
         <div class="card card-dark mt-3" id="gt-matrix-card" style="display:none">
-          <div class="card-header text-muted small">📊 Payoff Matrix (us vs opponent)</div>
+          <div class="card-header text-muted small">📊 Ma trận payoff (ta vs đối thủ)</div>
           <div class="card-body p-2" id="gt-matrix-body"></div>
         </div>
 
@@ -1117,7 +1117,7 @@
         <div class="card card-dark mt-3">
           <div class="card-header text-muted small">Lý thuyết</div>
           <div class="card-body p-2 small text-muted">
-            <div class="mb-1"><span class="text-warning">Nash EQ</span> — không ai muốn unilaterally deviate</div>
+            <div class="mb-1"><span class="text-warning">Nash EQ</span> — không ai muốn đơn phương lệch chiến lược</div>
             <div class="mb-1"><span class="text-success">Bayesian</span> — P(type|obs) ∝ P(obs|type)·P(type)</div>
             <div class="mb-1"><span class="text-info">EXP3</span> — regret ≤ O(√KT·lnK) vs adversary</div>
             <div class="mb-1"><span class="text-warning">Crowding</span> — cùng side → payout giảm</div>
@@ -1131,25 +1131,25 @@
 
         <!-- Recommendation card -->
         <div class="card card-dark" id="gt-rec-card" style="display:none">
-          <div class="card-header text-muted small">🎯 Strategic Recommendation</div>
+          <div class="card-header text-muted small">🎯 De xuat chien luoc</div>
           <div class="card-body" id="gt-rec-body"></div>
         </div>
 
         <!-- Opponent model -->
         <div class="card card-dark mt-3" id="gt-opp-card" style="display:none">
-          <div class="card-header text-muted small">🔍 Bayesian Opponent Model</div>
+          <div class="card-header text-muted small">🔍 Mo hinh doi thu Bayes</div>
           <div class="card-body p-2" id="gt-opp-body"></div>
         </div>
 
         <!-- EXP3 weights -->
         <div class="card card-dark mt-3" id="gt-exp3-card" style="display:none">
-          <div class="card-header text-muted small">🎲 EXP3 Adversarial Bandit</div>
+          <div class="card-header text-muted small">🎲 Bandit đối kháng EXP3</div>
           <div class="card-body p-2" id="gt-exp3-body"></div>
         </div>
 
         <!-- Platform pressure -->
         <div class="card card-dark mt-3" id="gt-pressure-card" style="display:none">
-          <div class="card-header text-muted small">🔴 Platform Pressure Detector</div>
+          <div class="card-header text-muted small">🔴 Bo phat hien ap luc nen tang</div>
           <div class="card-body p-2" id="gt-pressure-body"></div>
         </div>
       </div>
@@ -1159,16 +1159,16 @@
 
         <!-- Ecosystem simulation chart area -->
         <div class="card card-dark" id="gt-eco-card" style="display:none">
-          <div class="card-header text-muted small">🌐 Ecosystem Simulation</div>
+          <div class="card-header text-muted small">🌐 Mo phong he sinh thai</div>
           <div class="card-body p-2" id="gt-eco-body"></div>
         </div>
 
         <!-- Agent states table -->
         <div class="card card-dark mt-3" id="gt-agents-card" style="display:none">
-          <div class="card-header text-muted small">👥 Agent Leaderboard</div>
+          <div class="card-header text-muted small">👥 Bang xep hang tac nhan</div>
           <div class="card-body p-0">
             <table class="table table-dark table-sm mb-0" id="gt-agents-table">
-              <thead><tr><th>Agent</th><th>Type</th><th>WR</th><th>PnL</th></tr></thead>
+              <thead><tr><th>Tác nhân</th><th>Loại</th><th>TL thắng</th><th>PnL</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -1176,7 +1176,7 @@
 
         <!-- Insights -->
         <div class="card card-dark mt-3" id="gt-insights-card" style="display:none">
-          <div class="card-header text-muted small">💡 Strategic Insights</div>
+          <div class="card-header text-muted small">💡 Goc nhin chien luoc</div>
           <div class="card-body p-2" id="gt-insights-body"></div>
         </div>
       </div>
@@ -1190,7 +1190,7 @@
       <div class="col-md-8 mx-auto">
         <div class="card card-dark">
           <div class="card-header">
-            <i class="bi bi-robot text-info"></i> LLM Analyst
+            <i class="bi bi-robot text-info"></i> Nha phan tich LLM
             <span class="badge bg-secondary ms-2" id="llm-status-badge">Chưa kết nối</span>
           </div>
           <div class="card-body">
@@ -1202,12 +1202,12 @@
                   <li>Đề xuất cải thiện chiến lược</li>
                   <li>Trả lời câu hỏi về hiệu suất</li>
                 </ul>
-                <small class="text-muted">(Cần bật LLM_ENABLED và cung cấp API key)</small>
+                <small class="text-muted">(Cần bật LLM_ENABLED và cung cấp khóa API)</small>
               </div>
             </div>
             <div class="input-group">
               <input type="text" class="form-control bg-dark text-light border-secondary"
-                     id="llm-input" placeholder="Hỏi AI analyst... (vd: Tại sao hôm nay thua nhiều?)"
+                     id="llm-input" placeholder="Hoi nha phan tich AI... (vd: Vi sao hom nay thua nhieu?)"
                      onkeydown="if(event.key==='Enter') sendLLMQuestion()">
               <button class="btn btn-info" onclick="sendLLMQuestion()" id="llm-send-btn">
                 <i class="bi bi-send"></i>
@@ -1241,8 +1241,8 @@
           <table class="table table-dark table-hover table-sm mb-0">
             <thead class="table-secondary">
               <tr>
-                <th>Thời gian</th><th>Symbol</th><th>Hướng</th>
-                <th>Score</th><th>Stake</th><th>Payout</th><th>P&amp;L</th><th>Kết quả</th>
+                <th>Thời gian</th><th>Mã</th><th>Hướng</th>
+                <th>Điểm</th><th>Vốn lệnh</th><th>Chi trả</th><th>P&amp;L</th><th>Kết quả</th>
               </tr>
             </thead>
             <tbody id="logs-body">
