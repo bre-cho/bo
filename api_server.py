@@ -1413,6 +1413,9 @@ def create_app():
             "status"           : overall,
             "configured"       : token_present,
             "token_present"    : token_present,
+            "deriv_env"        : getattr(config, "DERIV_ENV", "demo"),
+            "token_source"     : getattr(config, "DERIV_TOKEN_SOURCE", "unknown"),
+            "live_trading_enabled": bool(getattr(config, "LIVE_TRADING_ENABLED", False)),
             "broker_reachable" : broker_reachable,
             "order_capable"    : order_capable,
             "stage"            : report.get("stage", "token"),
@@ -1433,6 +1436,9 @@ def create_app():
                 "stage"            : payload["stage"],
                 "symbol"           : payload["symbol"],
                 "token_present"    : payload["token_present"],
+                "deriv_env"        : payload["deriv_env"],
+                "token_source"     : payload["token_source"],
+                "live_trading_enabled": payload["live_trading_enabled"],
                 "broker_reachable" : payload["broker_reachable"],
                 "order_capable"    : payload["order_capable"],
                 "timeout_seconds"  : payload["timeout_seconds"],
@@ -1465,6 +1471,39 @@ def create_app():
                 "detail": str(exc),
             }
 
+    @app.get("/health/safety-summary")
+    async def health_safety_summary(r: redis.Redis = Depends(get_redis)):
+        """Tóm tắt các khóa an toàn live trading để dashboard hiển thị nhanh."""
+        token = (config.DERIV_API_TOKEN or "").strip()
+        token_present = len(token) >= 8
+        deriv_env = getattr(config, "DERIV_ENV", "demo")
+        token_source = getattr(config, "DERIV_TOKEN_SOURCE", "unknown")
+        live_enabled = bool(getattr(config, "LIVE_TRADING_ENABLED", False))
+
+        try:
+            mode_raw = r.get("Deriv_EngineMode")
+            engine_mode = mode_raw.decode() if mode_raw else "UNKNOWN"
+        except Exception:
+            engine_mode = "UNKNOWN"
+
+        armed = bool(live_enabled and deriv_env == "live" and token_present and engine_mode == "LIVE")
+        if armed:
+            state = "armed"
+        else:
+            state = "disarmed"
+
+        return {
+            "status": "ok",
+            "engine_mode": engine_mode,
+            "deriv_env": deriv_env,
+            "token_source": token_source,
+            "token_present": token_present,
+            "live_trading_enabled": live_enabled,
+            "live_switch_state": state,
+            "armed": armed,
+            "can_execute_live": armed,
+        }
+
     # ── Deriv check (compat) ──────────────────────────────────────
     @app.get("/deriv/check")
     async def deriv_check():
@@ -1473,6 +1512,9 @@ def create_app():
         return {
             "configured"       : deep["configured"],
             "token_present"    : deep["token_present"],
+            "deriv_env"        : deep["deriv_env"],
+            "token_source"     : deep["token_source"],
+            "live_trading_enabled": deep["live_trading_enabled"],
             "broker_reachable" : deep["broker_reachable"],
             "order_capable"    : deep["order_capable"],
             "stage"            : deep["stage"],
@@ -1575,11 +1617,18 @@ def create_app():
         # 2. Deriv API token configured
         deriv_token = config.DERIV_API_TOKEN
         if deriv_token and len(deriv_token) >= 8:
-            checks["deriv_token"] = {"status": "configured"}
+            checks["deriv_token"] = {
+                "status": "configured",
+                "mode": getattr(config, "DERIV_ENV", "demo"),
+                "source": getattr(config, "DERIV_TOKEN_SOURCE", "unknown"),
+            }
         else:
+            expected_var = "DERIV_API_TOKEN_LIVE" if getattr(config, "DERIV_ENV", "demo") == "live" else "DERIV_API_TOKEN_DEMO"
             checks["deriv_token"] = {
                 "status": "missing",
-                "detail": "DERIV_API_TOKEN not set in environment",
+                "mode": getattr(config, "DERIV_ENV", "demo"),
+                "source": getattr(config, "DERIV_TOKEN_SOURCE", "unknown"),
+                "detail": f"{expected_var} not set in environment",
             }
             overall = "degraded"
 
@@ -1607,11 +1656,18 @@ def create_app():
         try:
             from db.database import SessionLocal
             from db.models import AuditLog
+            db_path = os.environ.get("SQLITE_DB_PATH", "bo_trading.db")
             with SessionLocal() as db:
                 db.query(AuditLog).limit(1).all()
-            checks["sqlite"] = {"status": "ok", "path": os.environ.get("SQLITE_DB_PATH", "bo_trading.db")}
+            checks["sqlite"] = {"status": "ok", "path": db_path}
+            checks["database"] = {
+                "status": "ok",
+                "backend": "sqlite",
+                "path": db_path,
+            }
         except Exception as exc:
             checks["sqlite"] = {"status": "error", "detail": str(exc)}
+            checks["database"] = {"status": "error", "backend": "sqlite", "detail": str(exc)}
             overall = "degraded"
 
         # 6. Engine mode from Redis
@@ -1620,9 +1676,13 @@ def create_app():
             checks["engine_mode"] = {
                 "status": "ok",
                 "mode"  : mode_raw.decode() if mode_raw else "UNKNOWN",
+                "live_trading_enabled": bool(getattr(config, "LIVE_TRADING_ENABLED", False)),
             }
         except Exception:
-            checks["engine_mode"] = {"status": "unavailable"}
+            checks["engine_mode"] = {
+                "status": "unavailable",
+                "live_trading_enabled": bool(getattr(config, "LIVE_TRADING_ENABLED", False)),
+            }
 
         return {"status": overall, "checks": checks}
 

@@ -39,10 +39,16 @@ Can tao file `.env` tai root (co the copy tu `.env.example`).
 
 Gia tri toi thieu:
 
-- `DERIV_API_TOKEN`
+- `DERIV_ENV=demo` (hoac `live`)
+- `DERIV_API_TOKEN_DEMO` (khuyen nghi)
+- `DERIV_API_TOKEN_LIVE` (bat buoc neu `DERIV_ENV=live`)
+- `LIVE_TRADING_ENABLED=false` (mac dinh fail-closed)
 - `API_SECRET_KEY`
 - `REDIS_HOST=redis`
 - `REDIS_PORT=6379`
+
+Tuong thich nguoc: co the dung `DERIV_API_TOKEN`, nhung uu tien tach rieng demo/live.
+DB backend hien tai la SQLite (khong phai Postgres) va duoc check qua `/health`.
 
 Luu y: khi chay bang docker compose, `REDIS_HOST` phai la `redis` (service name),
 khong dung `localhost`.

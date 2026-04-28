@@ -54,6 +54,18 @@ class BOExecutionGuard:
         if not risk_can_trade:
             return GovernanceVerdict("DANGER", "KILL_SWITCH", ["risk_manager_blocked"], 0.0)
 
+        # 2.1 Master safety switch for live trading (fail-closed)
+        if not getattr(config, "LIVE_TRADING_ENABLED", False):
+            return GovernanceVerdict("DANGER", "KILL_SWITCH", ["live_trading_disabled"], 0.0)
+
+        # 2.2 Runtime mode must explicitly be live
+        if getattr(config, "DERIV_ENV", "demo") != "live":
+            return GovernanceVerdict("DANGER", "KILL_SWITCH", ["deriv_env_not_live"], 0.0)
+
+        # 2.3 Selected token must exist for current runtime mode
+        if not getattr(config, "DERIV_API_TOKEN", ""):
+            return GovernanceVerdict("DANGER", "KILL_SWITCH", ["deriv_token_missing"], 0.0)
+
         # 3. Daily loss hard stop
         hard_daily_loss_pct = getattr(config, "BO_HARD_DAILY_LOSS_PCT", 0.08)
         if balance > 0 and daily_pnl <= -(balance * hard_daily_loss_pct):

@@ -13,10 +13,46 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
 # --- Deriv API ---
-DERIV_API_TOKEN = os.getenv("DERIV_API_TOKEN", "")  # Đặt trong .env
-DERIV_APP_ID    = 1089                     # App ID mặc định (demo). Tạo app tại https://api.deriv.com/app-registration
+# Chế độ Deriv runtime: demo | live
+DERIV_ENV = os.getenv("DERIV_ENV", "demo").strip().lower()
+if DERIV_ENV not in {"demo", "live"}:
+    DERIV_ENV = "demo"
+
+# Tách token demo/live rõ ràng; giữ DERIV_API_TOKEN để tương thích ngược.
+DERIV_API_TOKEN_DEMO = os.getenv("DERIV_API_TOKEN_DEMO", "")
+DERIV_API_TOKEN_LIVE = os.getenv("DERIV_API_TOKEN_LIVE", "")
+_DERIV_API_TOKEN_LEGACY = os.getenv("DERIV_API_TOKEN", "")
+
+if DERIV_ENV == "live":
+    DERIV_API_TOKEN = (DERIV_API_TOKEN_LIVE or _DERIV_API_TOKEN_LEGACY).strip()
+    DERIV_TOKEN_SOURCE = "live" if DERIV_API_TOKEN_LIVE.strip() else ("legacy" if _DERIV_API_TOKEN_LEGACY.strip() else "missing")
+else:
+    DERIV_API_TOKEN = (DERIV_API_TOKEN_DEMO or _DERIV_API_TOKEN_LEGACY).strip()
+    DERIV_TOKEN_SOURCE = "demo" if DERIV_API_TOKEN_DEMO.strip() else ("legacy" if _DERIV_API_TOKEN_LEGACY.strip() else "missing")
+
+DERIV_APP_ID    = _env_int("DERIV_APP_ID", 1089)  # App ID lấy từ .env
 DERIV_WS_URL    = f"wss://ws.binaryws.com/websockets/v3?app_id={DERIV_APP_ID}"
+
+# Khóa an toàn live-trading: mặc định fail-closed.
+LIVE_TRADING_ENABLED = _env_bool("LIVE_TRADING_ENABLED", False)
 
 # --- Thị trường giao dịch ---
 # Các symbol phổ biến trên Deriv:

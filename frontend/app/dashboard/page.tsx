@@ -9,6 +9,7 @@ import type {
   StatsResponse,
   BalanceResponse,
   DerivHealthResponse,
+  DerivSafetySummaryResponse,
 } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -24,12 +25,13 @@ async function safeGet<T>(url: string): Promise<T | null> {
 }
 
 export default async function DashboardPage() {
-  const [health, status, stats, balance, derivHealth] = await Promise.all([
+  const [health, status, stats, balance, derivHealth, safetySummary] = await Promise.all([
     safeGet<HealthResponse>(`${API}/health`),
     safeGet<StatusResponse>(`${API}/status`),
     safeGet<StatsResponse>(`${API}/stats`),
     safeGet<BalanceResponse>(`${API}/balance`),
     safeGet<DerivHealthResponse>(`${API}/health/deriv`),
+    safeGet<DerivSafetySummaryResponse>(`${API}/health/safety-summary`),
   ]);
 
   return (
@@ -104,8 +106,8 @@ export default async function DashboardPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <MetricRow label="Buoc" value={derivHealth.stage} />
-              <MetricRow label="Symbol" value={derivHealth.symbol} />
-              <MetricRow label="Timeout" value={`${derivHealth.timeout_seconds}s`} />
+              <MetricRow label="Ma" value={derivHealth.symbol} />
+              <MetricRow label="Thoi gian cho" value={`${derivHealth.timeout_seconds}s`} />
               <MetricRow
                 label="Tong latency"
                 value={derivHealth.latency_ms.total != null ? `${derivHealth.latency_ms.total} ms` : "—"}
@@ -122,7 +124,7 @@ export default async function DashboardPage() {
                 value={derivHealth.latency_ms.authorize != null ? `${derivHealth.latency_ms.authorize} ms` : "—"}
               />
               <MetricRow
-                label="Proposal"
+                label="Bao gia"
                 value={derivHealth.latency_ms.proposal != null ? `${derivHealth.latency_ms.proposal} ms` : "—"}
               />
             </div>
@@ -131,6 +133,30 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <p className="text-red-400 text-sm">Khong tai duoc thong tin /health/deriv.</p>
+        )}
+      </section>
+
+      {/* Safety summary */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-400 uppercase mb-2">Tom tat khoa an toan live</h2>
+        {safetySummary ? (
+          <div className="card space-y-3 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <HealthCard label="Switch live" status={safetySummary.live_switch_state === "armed" ? "ok" : "degraded"} />
+              <HealthCard label="Token" status={safetySummary.token_present ? "ok" : "missing"} />
+              <HealthCard label="Che do Deriv" status={safetySummary.deriv_env === "live" ? "ok" : "degraded"} />
+              <HealthCard label="Engine mode" status={safetySummary.engine_mode === "LIVE" ? "ok" : "degraded"} />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <MetricRow label="Trang thai switch" value={safetySummary.live_switch_state === "armed" ? "Armed" : "Disarmed"} />
+              <MetricRow label="Nguon token" value={safetySummary.token_source} />
+              <MetricRow label="Mode runtime" value={safetySummary.deriv_env} />
+              <MetricRow label="Live executable" value={safetySummary.can_execute_live ? "CO" : "KHONG"} />
+            </div>
+          </div>
+        ) : (
+          <p className="text-red-400 text-sm">Khong tai duoc thong tin /health/safety-summary.</p>
         )}
       </section>
     </div>

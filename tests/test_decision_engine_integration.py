@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import bo_governance
 import decision_engine
+import pytest
 from pipeline import LoadLimiter, Orchestrator, PermissionGate, PipelineMetrics, QueuedTrade, TradeQueue
 
 
@@ -346,3 +347,51 @@ def test_dispatch_rejects_when_risk_false_and_other_gates_not_enough():
     assert outcome.rejected_by
     assert "risk" in outcome.rejected_by
     assert called["executor"] == 0
+
+
+def test_run_live_cycle_persists_trade_to_sqlite(monkeypatch):
+    pytest.importorskip("sqlalchemy")
+    from db.database import SessionLocal, init_db
+    from db.models import TradeLog
+
+    init_db()
+
+    engine = _make_engine()
+    signal = _make_signal()
+    cid = "CID-E2E-SQLITE-1"
+
+    monkeypatch.setattr(decision_engine, "MemoryBrain", _MemoryFacade)
+    monkeypatch.setattr(decision_engine, "pick_best_entry", lambda symbols: signal)
+    monkeypatch.setattr(decision_engine.deriv_data, "fetch_candles", lambda symbol: object())
+    monkeypatch.setattr(engine, "decide_entry", lambda sig, df, bal: (True, _FakePrediction()))
+    monkeypatch.setattr(
+        decision_engine,
+        "place_and_wait",
+        lambda contract_type, symbol, stake: {
+            "won": True,
+            "pnl": 0.66,
+            "payout": 1.66,
+            "contract_id": cid,
+        },
+    )
+
+    class _AllowGuard:
+        def validate_trade(self, **kwargs):
+            return bo_governance.GovernanceVerdict(
+                status="VALID",
+                action="ALLOW",
+                reasons=["ok"],
+                score=1.0,
+            )
+
+    monkeypatch.setattr(bo_governance, "BOExecutionGuard", _AllowGuard)
+
+    engine.run_live_cycle(balance=100.0)
+
+    with SessionLocal() as db:
+        row = db.query(TradeLog).filter(TradeLog.contract_id == cid).first()
+
+    assert row is not None
+    assert row.symbol == "R_100"
+    assert row.direction == "CALL"
+    assert row.result == "WIN"

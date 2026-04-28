@@ -55,11 +55,11 @@ export default function AuditPage() {
                 <tr className="border-b text-left text-gray-400 text-xs uppercase" style={{ borderColor: "var(--border)" }}>
                   <th className="py-2 pr-4">Thoi gian</th>
                   <th className="py-2 pr-4">Trang thai</th>
-                  <th className="py-2 pr-4">Stage</th>
+                  <th className="py-2 pr-4">Giai doan</th>
                   <th className="py-2 pr-4">Tong ms</th>
-                  <th className="py-2 pr-4">Connect</th>
-                  <th className="py-2 pr-4">Authorize</th>
-                  <th className="py-2 pr-4">Proposal</th>
+                  <th className="py-2 pr-4">Ket noi</th>
+                  <th className="py-2 pr-4">Xac thuc</th>
+                  <th className="py-2 pr-4">Bao gia</th>
                 </tr>
               </thead>
               <tbody>

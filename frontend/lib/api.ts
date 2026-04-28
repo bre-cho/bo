@@ -127,6 +127,9 @@ export interface EvolutionHistoryResponse {
 export interface DerivCheckResponse {
   configured:        boolean;
   token_present:     boolean;
+  deriv_env:         string;
+  token_source:      string;
+  live_trading_enabled: boolean;
   broker_reachable:  boolean;
   order_capable:     boolean;
   stage:             string;
@@ -141,6 +144,9 @@ export interface DerivHealthResponse {
   status:            "ok" | "degraded" | "missing";
   configured:        boolean;
   token_present:     boolean;
+  deriv_env:         string;
+  token_source:      string;
+  live_trading_enabled: boolean;
   broker_reachable:  boolean;
   order_capable:     boolean;
   stage:             string;
@@ -164,6 +170,9 @@ export interface DerivHealthHistoryRecord {
   stage:            string;
   symbol:           string;
   token_present:    boolean;
+  deriv_env?:       string;
+  token_source?:    string;
+  live_trading_enabled?: boolean;
   broker_reachable: boolean;
   order_capable:    boolean;
   timeout_seconds:  number;
@@ -182,6 +191,18 @@ export interface DerivHealthHistoryResponse {
   records: DerivHealthHistoryRecord[];
 }
 
+export interface DerivSafetySummaryResponse {
+  status: "ok";
+  engine_mode: string;
+  deriv_env: string;
+  token_source: string;
+  token_present: boolean;
+  live_trading_enabled: boolean;
+  live_switch_state: "armed" | "disarmed";
+  armed: boolean;
+  can_execute_live: boolean;
+}
+
 // ── API calls ────────────────────────────────────────────────────
 
 export const api = {
@@ -192,6 +213,7 @@ export const api = {
   derivCheck: ()                     => request<DerivCheckResponse>("/deriv/check"),
   derivHealth: (timeout_seconds = 6) => request<DerivHealthResponse>(`/health/deriv?timeout_seconds=${timeout_seconds}`),
   derivHealthHistory: (n = 30)       => request<DerivHealthHistoryResponse>(`/health/deriv/history?n=${n}`),
+  derivSafetySummary: ()             => request<DerivSafetySummaryResponse>("/health/safety-summary"),
 
   logs: (page = 1, size = 20)        => request<LogsResponse>(`/logs?page=${page}&size=${size}`),
   auditLogs: (page = 1, size = 50)   => request<AuditLogsResponse>(`/audit/logs?page=${page}&size=${size}`),

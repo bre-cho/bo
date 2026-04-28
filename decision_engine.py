@@ -665,7 +665,52 @@ class DecisionEngine:
             indicators   = indicators,
         )
         self.logger.log(record)
+        self._persist_trade_to_sqlite(record=record, trade=trade, raw_result=result)
         return result
+
+    def _persist_trade_to_sqlite(self, *, record: TradeRecord, trade: QueuedTrade, raw_result: dict) -> None:
+        """Mirror one executed worker trade into SQLite trade_logs (best-effort)."""
+        try:
+            from db.database import SessionLocal, init_db
+            from db.models import TradeLog
+
+            init_db()
+            contract_id = raw_result.get("contract_id")
+            result_label = "WIN" if record.won else "LOSS"
+            payload = {
+                "timestamp" : record.timestamp,
+                "symbol" : record.symbol,
+                "direction" : record.direction,
+                "stake_usd" : record.stake,
+                "payout_usd" : record.payout,
+                "result" : result_label,
+                "score" : record.signal_score,
+                "strategy" : "decision_engine",
+                "contract_id" : contract_id,
+                "pnl" : record.pnl,
+                "raw" : raw_result,
+            }
+
+            with SessionLocal() as db:
+                row = None
+                if contract_id:
+                    row = db.query(TradeLog).filter(TradeLog.contract_id == contract_id).first()
+                if row is None:
+                    row = TradeLog()
+                    db.add(row)
+
+                row.symbol = record.symbol
+                row.direction = record.direction
+                row.stake_usd = float(record.stake)
+                row.payout_usd = float(record.payout)
+                row.result = result_label
+                row.score = float(record.signal_score)
+                row.strategy = "decision_engine"
+                row.contract_id = contract_id
+                row.raw_json = json.dumps(payload, ensure_ascii=False)
+                db.commit()
+        except Exception as exc:
+            print(f"  [DB] ⚠️ Không ghi được trade_logs SQLite: {exc}")
 
     # ── ⑤ tự sửa lỗi ─────────────────────────────────────────────
 

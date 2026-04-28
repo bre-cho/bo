@@ -72,11 +72,19 @@ def test_health_deriv_history_returns_200(client):
     assert resp.status_code == 200
 
 
+def test_health_safety_summary_returns_200(client):
+    resp = client.get("/health/safety-summary")
+    assert resp.status_code == 200
+
+
 def test_deriv_check_has_expected_fields(client):
     body = client.get("/deriv/check").json()
     for field in (
         "configured",
         "token_present",
+        "deriv_env",
+        "token_source",
+        "live_trading_enabled",
         "broker_reachable",
         "order_capable",
         "stage",
@@ -94,6 +102,9 @@ def test_health_deriv_has_expected_fields(client):
         "status",
         "configured",
         "token_present",
+        "deriv_env",
+        "token_source",
+        "live_trading_enabled",
         "broker_reachable",
         "order_capable",
         "stage",
@@ -116,6 +127,30 @@ def test_health_deriv_history_has_expected_fields(client):
         assert field in body, f"Missing field: {field}"
     assert body["status"] in ("ok", "degraded")
     assert isinstance(body["records"], list)
+
+
+def test_health_safety_summary_has_expected_fields(client):
+    body = client.get("/health/safety-summary").json()
+    for field in (
+        "status",
+        "engine_mode",
+        "deriv_env",
+        "token_source",
+        "token_present",
+        "live_trading_enabled",
+        "live_switch_state",
+        "armed",
+        "can_execute_live",
+    ):
+        assert field in body, f"Missing field: {field}"
+    assert body["status"] == "ok"
+    assert body["live_switch_state"] in ("armed", "disarmed")
+
+
+def test_health_database_backend_is_sqlite(client):
+    body = client.get("/health").json()
+    assert "database" in body["checks"]
+    assert body["checks"]["database"]["backend"] == "sqlite"
 
 
 def test_deriv_check_configured_false_when_no_token(client, monkeypatch):

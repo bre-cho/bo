@@ -93,6 +93,8 @@ async def probe_live_path(timeout_seconds: float = 6.0) -> dict:
     """
     token = (config.DERIV_API_TOKEN or "").strip()
     token_present = _token_present(token)
+    deriv_env = getattr(config, "DERIV_ENV", "demo")
+    token_source = getattr(config, "DERIV_TOKEN_SOURCE", "unknown")
     symbol = (
         (config.SCAN_SYMBOLS[0] if getattr(config, "SCAN_SYMBOLS", None) else None)
         or getattr(config, "SYMBOL", "R_100")
@@ -101,6 +103,8 @@ async def probe_live_path(timeout_seconds: float = 6.0) -> dict:
 
     result = {
         "token_present"    : token_present,
+        "deriv_env"        : deriv_env,
+        "token_source"     : token_source,
         "broker_reachable" : False,
         "order_capable"    : False,
         "stage"            : "token",
@@ -118,7 +122,11 @@ async def probe_live_path(timeout_seconds: float = 6.0) -> dict:
     t0 = time.perf_counter()
 
     if not token_present:
-        result["detail"] = "DERIV_API_TOKEN chưa cấu hình hoặc đang là placeholder"
+        expected_var = "DERIV_API_TOKEN_LIVE" if deriv_env == "live" else "DERIV_API_TOKEN_DEMO"
+        result["detail"] = (
+            f"Token Deriv thiếu cho mode '{deriv_env}'. "
+            f"Hãy cấu hình {expected_var} (hoặc DERIV_API_TOKEN cho tương thích cũ)."
+        )
         return result
 
     try:
