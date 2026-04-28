@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --green:   #3fb950;
+  --red:     #f85149;
+  --blue:    #58a6ff;
+  --yellow:  #d29922;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.card {
+  @apply rounded-lg border p-4;
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.badge-ok      { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-green-900 text-green-300; }
+.badge-degraded{ @apply text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-900 text-yellow-300; }
+.badge-error   { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-red-900   text-red-300; }
+.badge-missing { @apply text-xs font-medium px-2 py-0.5 rounded-full bg-gray-800  text-gray-400; }
+
+.btn-primary {
+  @apply px-4 py-2 rounded-md text-sm font-medium transition-colors;
+  background: var(--blue);
+  color: #fff;
+}
+.btn-primary:hover  { filter: brightness(1.15); }
+.btn-danger {
+  @apply px-4 py-2 rounded-md text-sm font-medium transition-colors;
+  background: var(--red);
+  color: #fff;
+}
+.btn-danger:hover  { filter: brightness(1.15); }
+.btn-ghost {
+  @apply px-4 py-2 rounded-md text-sm font-medium border transition-colors;
+  border-color: var(--border);
+}
+.btn-ghost:hover { background: var(--border); }
