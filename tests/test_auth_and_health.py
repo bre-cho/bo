@@ -54,7 +54,7 @@ def test_health_deriv_token_check_has_status(client):
 
 
 # ──────────────────────────────────────────────────────────────
-# /deriv/check
+# /deriv/check + /health/deriv
 # ──────────────────────────────────────────────────────────────
 
 def test_deriv_check_returns_200(client):
@@ -62,10 +62,60 @@ def test_deriv_check_returns_200(client):
     assert resp.status_code == 200
 
 
+def test_health_deriv_returns_200(client):
+    resp = client.get("/health/deriv")
+    assert resp.status_code == 200
+
+
+def test_health_deriv_history_returns_200(client):
+    resp = client.get("/health/deriv/history")
+    assert resp.status_code == 200
+
+
 def test_deriv_check_has_expected_fields(client):
     body = client.get("/deriv/check").json()
-    for field in ("configured", "app_id", "ws_url", "detail"):
+    for field in (
+        "configured",
+        "token_present",
+        "broker_reachable",
+        "order_capable",
+        "stage",
+        "app_id",
+        "ws_url",
+        "symbol",
+        "detail",
+    ):
         assert field in body, f"Missing field: {field}"
+
+
+def test_health_deriv_has_expected_fields(client):
+    body = client.get("/health/deriv").json()
+    for field in (
+        "status",
+        "configured",
+        "token_present",
+        "broker_reachable",
+        "order_capable",
+        "stage",
+        "app_id",
+        "ws_url",
+        "symbol",
+        "timeout_seconds",
+        "latency_ms",
+        "detail",
+    ):
+        assert field in body, f"Missing field: {field}"
+    assert isinstance(body["latency_ms"], dict)
+    for k in ("connect", "authorize", "proposal", "total"):
+        assert k in body["latency_ms"], f"Missing latency key: {k}"
+
+
+def test_health_deriv_history_has_expected_fields(client):
+    body = client.get("/health/deriv/history").json()
+    for field in ("status", "n", "records"):
+        assert field in body, f"Missing field: {field}"
+    assert body["status"] in ("ok", "degraded")
+    assert isinstance(body["records"], list)
 
 
 def test_deriv_check_configured_false_when_no_token(client, monkeypatch):
@@ -75,9 +125,13 @@ def test_deriv_check_configured_false_when_no_token(client, monkeypatch):
     cfg.DERIV_API_TOKEN = ""
     try:
         body = client.get("/deriv/check").json()
-        # When token is empty configured must be False
+        # Khi token rong, tat ca live checks phai false
         assert body["configured"] is False
+        assert body["token_present"] is False
+        assert body["broker_reachable"] is False
+        assert body["order_capable"] is False
         assert body["token_hint"] is None
+        assert body["stage"] == "token"
     finally:
         cfg.DERIV_API_TOKEN = original
 

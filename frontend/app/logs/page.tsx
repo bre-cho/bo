@@ -1,6 +1,6 @@
 "use client";
 /**
- * app/logs/page.tsx — Trade log viewer (paginated).
+ * app/logs/page.tsx — Man hinh nhat ky lenh (phan trang).
  */
 import { useEffect, useState, useCallback } from "react";
 import { api, type LogRecord } from "@/lib/api";
@@ -29,26 +29,26 @@ export default function LogsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-100">Trade Logs</h1>
-        <span className="text-sm text-gray-400">{total} total records</span>
+        <h1 className="text-2xl font-bold text-gray-100">Nhat ky lenh</h1>
+        <span className="text-sm text-gray-400">{total} ban ghi</span>
       </div>
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Loading…</p>
+        <p className="text-gray-500 text-sm">Dang tai…</p>
       ) : records.length === 0 ? (
-        <p className="text-gray-500 text-sm">No trades yet.</p>
+        <p className="text-gray-500 text-sm">Chua co lenh nao.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b text-left text-gray-400 text-xs uppercase" style={{ borderColor: "var(--border)" }}>
-                <th className="py-2 pr-4">Time</th>
-                <th className="py-2 pr-4">Symbol</th>
-                <th className="py-2 pr-4">Direction</th>
-                <th className="py-2 pr-4">Stake</th>
-                <th className="py-2 pr-4">Result</th>
-                <th className="py-2 pr-4">Score</th>
-                <th className="py-2 pr-4">Strategy</th>
+                <th className="py-2 pr-4">Thoi gian</th>
+                <th className="py-2 pr-4">Ma</th>
+                <th className="py-2 pr-4">Chieu</th>
+                <th className="py-2 pr-4">Von</th>
+                <th className="py-2 pr-4">Ket qua</th>
+                <th className="py-2 pr-4">Diem</th>
+                <th className="py-2 pr-4">Chien luoc</th>
               </tr>
             </thead>
             <tbody>
@@ -64,7 +64,7 @@ export default function LogsPage() {
                   <td className="py-2 pr-4 font-semibold text-blue-300">{r.symbol ?? "—"}</td>
                   <td className="py-2 pr-4">
                     <span className={r.direction === "CALL" ? "text-green-400" : "text-red-400"}>
-                      {r.direction ?? "—"}
+                      {r.direction === "CALL" ? "MUA" : r.direction === "PUT" ? "BAN" : "—"}
                     </span>
                   </td>
                   <td className="py-2 pr-4 text-gray-200">${r.stake_usd?.toFixed(2) ?? "—"}</td>
@@ -74,7 +74,7 @@ export default function LogsPage() {
                       r.result === "LOSS" ? "badge-error" :
                       "badge-missing"
                     }>
-                      {r.result ?? "OPEN"}
+                      {r.result === "WIN" ? "THANG" : r.result === "LOSS" ? "THUA" : "DANG MO"}
                     </span>
                   </td>
                   <td className="py-2 pr-4 text-gray-300">{r.score?.toFixed(1) ?? "—"}</td>
@@ -86,22 +86,22 @@ export default function LogsPage() {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Phan trang */}
       <div className="flex items-center gap-3">
         <button
           className="btn-ghost"
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
         >
-          ← Prev
+          ← Truoc
         </button>
-        <span className="text-sm text-gray-400">Page {page} / {totalPages}</span>
+        <span className="text-sm text-gray-400">Trang {page} / {totalPages}</span>
         <button
           className="btn-ghost"
           disabled={page >= totalPages}
           onClick={() => setPage((p) => p + 1)}
         >
-          Next →
+          Sau →
         </button>
       </div>
     </div>

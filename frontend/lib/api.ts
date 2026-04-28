@@ -1,9 +1,9 @@
 /**
  * lib/api.ts
- * Typed API client for the BO Trading Robot FastAPI backend.
+ * API client co kieu du lieu cho backend FastAPI.
  *
- * All paths are relative so the Next.js rewrite rule in next.config.mjs
- * forwards /api/* → FastAPI backend.
+ * Moi duong dan la tuong doi de Next.js rewrite /api/*
+ * ve FastAPI backend.
  */
 
 const BASE = "/api";
@@ -125,11 +125,61 @@ export interface EvolutionHistoryResponse {
 }
 
 export interface DerivCheckResponse {
-  configured:  boolean;
-  app_id:      number;
-  ws_url:      string;
-  token_hint:  string | null;
-  detail:      string;
+  configured:        boolean;
+  token_present:     boolean;
+  broker_reachable:  boolean;
+  order_capable:     boolean;
+  stage:             string;
+  app_id:            number;
+  ws_url:            string;
+  symbol:            string;
+  token_hint:        string | null;
+  detail:            string;
+}
+
+export interface DerivHealthResponse {
+  status:            "ok" | "degraded" | "missing";
+  configured:        boolean;
+  token_present:     boolean;
+  broker_reachable:  boolean;
+  order_capable:     boolean;
+  stage:             string;
+  app_id:            number;
+  ws_url:            string;
+  symbol:            string;
+  token_hint:        string | null;
+  timeout_seconds:   number;
+  latency_ms: {
+    connect:   number | null;
+    authorize: number | null;
+    proposal:  number | null;
+    total:     number | null;
+  };
+  detail:            string;
+}
+
+export interface DerivHealthHistoryRecord {
+  timestamp:        string;
+  status:           "ok" | "degraded" | "missing";
+  stage:            string;
+  symbol:           string;
+  token_present:    boolean;
+  broker_reachable: boolean;
+  order_capable:    boolean;
+  timeout_seconds:  number;
+  latency_ms: {
+    connect:   number | null;
+    authorize: number | null;
+    proposal:  number | null;
+    total:     number | null;
+  };
+  detail: string;
+}
+
+export interface DerivHealthHistoryResponse {
+  status: "ok";
+  n: number;
+  records: DerivHealthHistoryRecord[];
 }
 
 // ── API calls ────────────────────────────────────────────────────
@@ -140,12 +190,14 @@ export const api = {
   balance: ()                        => request<BalanceResponse>("/balance"),
   stats: ()                          => request<StatsResponse>("/stats"),
   derivCheck: ()                     => request<DerivCheckResponse>("/deriv/check"),
+  derivHealth: (timeout_seconds = 6) => request<DerivHealthResponse>(`/health/deriv?timeout_seconds=${timeout_seconds}`),
+  derivHealthHistory: (n = 30)       => request<DerivHealthHistoryResponse>(`/health/deriv/history?n=${n}`),
 
   logs: (page = 1, size = 20)        => request<LogsResponse>(`/logs?page=${page}&size=${size}`),
   auditLogs: (page = 1, size = 50)   => request<AuditLogsResponse>(`/audit/logs?page=${page}&size=${size}`),
   evolutionHistory: (page = 1)       => request<EvolutionHistoryResponse>(`/db/evolution?page=${page}`),
 
-  // Control (require API key)
+  // Dieu khien (can API key)
   enginePause:  ()                   => request<{ status: string }>("/engine/pause",  { method: "POST" }),
   engineResume: ()                   => request<{ status: string }>("/engine/resume", { method: "POST" }),
   engineStop:   ()                   => request<{ status: string }>("/engine/stop",   { method: "POST" }),

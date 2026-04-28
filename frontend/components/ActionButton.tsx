@@ -17,9 +17,9 @@ export default function ActionButton({ label, onConfirm, variant = "primary", di
     startTransition(async () => {
       try {
         await onConfirm();
-        setMsg("✓ ok");
+        setMsg("✓ Thanh cong");
       } catch (e: unknown) {
-        setMsg(`✗ ${(e as Error).message}`);
+        setMsg(`✗ Loi: ${(e as Error).message}`);
       }
     });
   }

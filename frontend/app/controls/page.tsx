@@ -1,8 +1,8 @@
 "use client";
 /**
  * app/controls/page.tsx — Client Component
- * Engine controls, TP/SL, strategy switcher.
- * Requires X-API-Key header (set in .env.local).
+ * Dieu khien dong co, TP/SL, doi chien luoc von.
+ * Can header X-API-Key (dat trong .env.local).
  */
 import { useState } from "react";
 import ActionButton from "@/components/ActionButton";
@@ -25,27 +25,27 @@ export default function ControlsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-100">Controls</h1>
+      <h1 className="text-2xl font-bold text-gray-100">Dieu khien</h1>
 
-      {/* Engine */}
+      {/* Dong co */}
       <section className="card space-y-4">
-        <h2 className="font-semibold text-gray-200">Engine Mode</h2>
+        <h2 className="font-semibold text-gray-200">Che do dong co</h2>
         <div className="flex flex-wrap gap-3">
-          <ActionButton label="Pause (→ PAPER)" onConfirm={api.enginePause} />
-          <ActionButton label="Resume (→ LIVE)"  onConfirm={api.engineResume} />
-          <ActionButton label="Stop"             onConfirm={api.engineStop} variant="danger" />
+          <ActionButton label="Tam dung (→ Mo phong)" onConfirm={api.enginePause} />
+          <ActionButton label="Tiep tuc (→ Thuc chien)"  onConfirm={api.engineResume} />
+          <ActionButton label="Dung"               onConfirm={api.engineStop} variant="danger" />
         </div>
         <p className="text-xs text-gray-500">
-          Pause switches to PAPER mode (no real trades). Stop halts the engine entirely.
+          Tam dung se chuyen sang PAPER (khong vao lenh that). Dung se tat dong co hoan toan.
         </p>
       </section>
 
-      {/* Daily TP / SL */}
+      {/* TP / SL trong ngay */}
       <section className="card space-y-4">
-        <h2 className="font-semibold text-gray-200">Daily Take-Profit / Stop-Loss (USD)</h2>
+        <h2 className="font-semibold text-gray-200">Chot lai / Chot lo trong ngay (USD)</h2>
         <div className="flex flex-wrap gap-6 items-end">
           <div className="space-y-1">
-            <label className="text-xs text-gray-400">Daily TP (USD)</label>
+            <label className="text-xs text-gray-400">TP trong ngay (USD)</label>
             <input
               type="number" min="0" step="1"
               value={tp}
@@ -55,13 +55,13 @@ export default function ControlsPage() {
             />
           </div>
           <ActionButton
-            label="Set TP"
+            label="Dat TP"
             onConfirm={() => api.setDailyTp(parseFloat(tp))}
           />
         </div>
         <div className="flex flex-wrap gap-6 items-end">
           <div className="space-y-1">
-            <label className="text-xs text-gray-400">Daily SL (USD)</label>
+            <label className="text-xs text-gray-400">SL trong ngay (USD)</label>
             <input
               type="number" min="0" step="1"
               value={sl}
@@ -71,22 +71,22 @@ export default function ControlsPage() {
             />
           </div>
           <ActionButton
-            label="Set SL"
+            label="Dat SL"
             onConfirm={() => api.setDailySl(parseFloat(sl))}
           />
         </div>
         <ActionButton
-          label="Restart after TP/SL stop"
+          label="Khoi dong lai sau khi dung TP/SL"
           onConfirm={api.restartEngine}
         />
       </section>
 
-      {/* Strategy */}
+      {/* Chien luoc von */}
       <section className="card space-y-4">
-        <h2 className="font-semibold text-gray-200">Capital Strategy</h2>
+        <h2 className="font-semibold text-gray-200">Chien luoc von</h2>
         <div className="flex flex-wrap gap-6 items-end">
           <div className="space-y-1">
-            <label className="text-xs text-gray-400">Strategy</label>
+            <label className="text-xs text-gray-400">Chien luoc</label>
             <select
               value={strat}
               onChange={(e) => setStrat(e.target.value)}
@@ -99,7 +99,7 @@ export default function ControlsPage() {
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-gray-400">Base Stake (USD)</label>
+            <label className="text-xs text-gray-400">Von goc (USD)</label>
             <input
               type="number" min="0.5" step="0.5"
               value={stake}
@@ -109,7 +109,7 @@ export default function ControlsPage() {
             />
           </div>
           <ActionButton
-            label="Apply Strategy"
+            label="Ap dung chien luoc"
             onConfirm={() => api.setStrategy(strat, parseFloat(stake))}
           />
         </div>

@@ -170,6 +170,8 @@ def create_app():
     def get_redis():
         return _r
 
+    _REDIS_DERIV_HEALTH_HISTORY_KEY = "Deriv_Health_History"
+
     # ── API key auth (controls + engine mutations) ────────────────
     _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -1384,26 +1386,101 @@ def create_app():
             ),
         }
 
-    # ── Deriv credential check ────────────────────────────────────
+    # ── Deriv health (deep) ───────────────────────────────────────
+    @app.get("/health/deriv")
+    async def health_deriv(timeout_seconds: float = Query(default=6.0, ge=2.0, le=20.0)):
+        """
+        Deep Deriv live-path health check với chi tiết latency/timeout.
+        """
+        from deriv_trade import probe_live_path
+
+        token = (config.DERIV_API_TOKEN or "").strip()
+        report = await probe_live_path(timeout_seconds=float(timeout_seconds))
+        token_present = bool(report.get("token_present", False))
+        broker_reachable = bool(report.get("broker_reachable", False))
+        order_capable = bool(report.get("order_capable", False))
+
+        if order_capable:
+            overall = "ok"
+        elif token_present and broker_reachable:
+            overall = "degraded"
+        elif token_present:
+            overall = "degraded"
+        else:
+            overall = "missing"
+
+        payload = {
+            "status"           : overall,
+            "configured"       : token_present,
+            "token_present"    : token_present,
+            "broker_reachable" : broker_reachable,
+            "order_capable"    : order_capable,
+            "stage"            : report.get("stage", "token"),
+            "app_id"           : config.DERIV_APP_ID,
+            "ws_url"           : config.DERIV_WS_URL,
+            "symbol"           : report.get("symbol", config.SYMBOL),
+            "token_hint"       : (token[:4] + "****") if token_present else None,
+            "timeout_seconds"  : report.get("timeout_seconds", timeout_seconds),
+            "latency_ms"       : report.get("latency_ms", {}),
+            "detail"           : report.get("detail", ""),
+        }
+
+        # Lưu history để dashboard/audit có thể theo dõi latency theo thời gian
+        try:
+            hist = {
+                "timestamp"        : datetime.now().isoformat(),
+                "status"           : payload["status"],
+                "stage"            : payload["stage"],
+                "symbol"           : payload["symbol"],
+                "token_present"    : payload["token_present"],
+                "broker_reachable" : payload["broker_reachable"],
+                "order_capable"    : payload["order_capable"],
+                "timeout_seconds"  : payload["timeout_seconds"],
+                "latency_ms"       : payload["latency_ms"],
+                "detail"           : payload["detail"],
+            }
+            _r.lpush(_REDIS_DERIV_HEALTH_HISTORY_KEY, json.dumps(hist, ensure_ascii=False))
+            _r.ltrim(_REDIS_DERIV_HEALTH_HISTORY_KEY, 0, 499)
+        except Exception:
+            pass
+
+        return payload
+
+    @app.get("/health/deriv/history")
+    async def health_deriv_history(n: int = Query(default=30, ge=1, le=200)):
+        """Lấy history probe /health/deriv gần nhất để theo dõi latency theo thời gian."""
+        try:
+            raw = _r.lrange(_REDIS_DERIV_HEALTH_HISTORY_KEY, 0, n - 1)
+            records = [json.loads(x) for x in raw]
+            return {
+                "status": "ok",
+                "n": len(records),
+                "records": records,
+            }
+        except Exception as exc:
+            return {
+                "status": "degraded",
+                "n": 0,
+                "records": [],
+                "detail": str(exc),
+            }
+
+    # ── Deriv check (compat) ──────────────────────────────────────
     @app.get("/deriv/check")
     async def deriv_check():
-        """
-        Lightweight Deriv credential check.
-        Does NOT place trades. Verifies token is set and non-empty.
-        Returns ws_url and whether token meets minimum length.
-        """
-        token = config.DERIV_API_TOKEN
-        configured = bool(token and len(token) >= 8)
+        """Compatibility endpoint. Use /health/deriv for full diagnostics."""
+        deep = await health_deriv(timeout_seconds=6.0)
         return {
-            "configured": configured,
-            "app_id"    : config.DERIV_APP_ID,
-            "ws_url"    : config.DERIV_WS_URL,
-            "token_hint": (token[:4] + "****") if configured else None,
-            "detail"    : (
-                "Token present — use /balance to confirm live connectivity"
-                if configured
-                else "DERIV_API_TOKEN not set or too short. Add it to .env"
-            ),
+            "configured"       : deep["configured"],
+            "token_present"    : deep["token_present"],
+            "broker_reachable" : deep["broker_reachable"],
+            "order_capable"    : deep["order_capable"],
+            "stage"            : deep["stage"],
+            "app_id"           : deep["app_id"],
+            "ws_url"           : deep["ws_url"],
+            "symbol"           : deep["symbol"],
+            "token_hint"       : deep["token_hint"],
+            "detail"           : deep["detail"],
         }
 
     # ── Audit log query (read) ────────────────────────────────────

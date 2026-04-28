@@ -1,7 +1,7 @@
 "use client";
 /**
  * app/evolution/page.tsx — Client Component
- * View champion genome, run evolution, promote to live config.
+ * Xem champion genome, chay tien hoa, day len cau hinh live.
  */
 import { useEffect, useState } from "react";
 import ActionButton from "@/components/ActionButton";
@@ -40,50 +40,50 @@ export default function EvolutionPage() {
   useEffect(() => { loadChampion(); }, []);
 
   async function handleRun() {
-    setRunMsg("Running…");
+    setRunMsg("Dang chay…");
     try {
       const res = await api.evolutionRun(5, 10) as { message: string };
       setRunMsg(res.message);
       await loadChampion();
     } catch (e: unknown) {
-      setRunMsg(`Error: ${(e as Error).message}`);
+      setRunMsg(`Loi: ${(e as Error).message}`);
     }
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-100">Evolution</h1>
+      <h1 className="text-2xl font-bold text-gray-100">Tien hoa</h1>
 
       <div className="flex gap-3 flex-wrap items-center">
-        <ActionButton label="Run Evolution (5 gen)" onConfirm={handleRun} />
-        <ActionButton label="Promote Champion to Live" onConfirm={api.evolutionPromote} />
+        <ActionButton label="Chay tien hoa (5 the he)" onConfirm={handleRun} />
+        <ActionButton label="Day champion len thuc chien" onConfirm={api.evolutionPromote} />
         {runMsg && <span className="text-xs text-yellow-400">{runMsg}</span>}
       </div>
 
-      {loading && <p className="text-gray-500 text-sm">Loading champion…</p>}
+      {loading && <p className="text-gray-500 text-sm">Dang tai champion…</p>}
 
       {!loading && !champion && (
-        <p className="text-gray-500 text-sm">No champion genome found. Run evolution first.</p>
+        <p className="text-gray-500 text-sm">Chua co champion genome. Hay chay tien hoa truoc.</p>
       )}
 
       {champion && (
         <div className="card space-y-4">
           <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-gray-200">Current Champion</h2>
-            <span className="badge-ok">gen {champion.generation}</span>
+            <h2 className="font-semibold text-gray-200">Champion hien tai</h2>
+            <span className="badge-ok">the he {champion.generation}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <Metric label="Fitness"        value={champion.fitness.toFixed(4)} />
-            <Metric label="Win Rate"       value={`${champion.win_rate_pct.toFixed(1)}%`} />
-            <Metric label="Profit Factor"  value={champion.profit_factor.toFixed(2)} />
-            <Metric label="Trades"         value={String(champion.n_trades)} />
-            <Metric label="Min Score"      value={champion.min_signal_score.toFixed(1)} />
-            <Metric label="Lookahead"      value={`${champion.lookahead_candles} candles`} />
-            <Metric label="Wave Weight"    value={champion.wave_weight.toFixed(3)} />
-            <Metric label="Genome ID"      value={champion.genome_id.slice(0, 12) + "…"} mono />
+            <Metric label="Fitness"         value={champion.fitness.toFixed(4)} />
+            <Metric label="Ty le thang"     value={`${champion.win_rate_pct.toFixed(1)}%`} />
+            <Metric label="He so loi nhuan" value={champion.profit_factor.toFixed(2)} />
+            <Metric label="So lenh"         value={String(champion.n_trades)} />
+            <Metric label="Diem toi thieu"  value={champion.min_signal_score.toFixed(1)} />
+            <Metric label="Tam nhin"        value={`${champion.lookahead_candles} nen`} />
+            <Metric label="Trong so song"   value={champion.wave_weight.toFixed(3)} />
+            <Metric label="Ma genome"       value={champion.genome_id.slice(0, 12) + "…"} mono />
           </div>
           <div>
-            <h3 className="text-xs text-gray-400 uppercase mb-2">Genes</h3>
+            <h3 className="text-xs text-gray-400 uppercase mb-2">Bo gene</h3>
             <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
               {Object.entries(champion.genes).map(([k, v]) => (
                 <div key={k} className="bg-gray-800 rounded px-2 py-1">

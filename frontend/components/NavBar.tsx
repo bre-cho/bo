@@ -3,11 +3,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "/dashboard",  label: "Dashboard" },
-  { href: "/controls",   label: "Controls" },
-  { href: "/evolution",  label: "Evolution" },
-  { href: "/logs",       label: "Trade Logs" },
-  { href: "/audit",      label: "Audit" },
+  { href: "/dashboard",  label: "Tong quan" },
+  { href: "/controls",   label: "Dieu khien" },
+  { href: "/evolution",  label: "Tien hoa" },
+  { href: "/logs",       label: "Nhat ky lenh" },
+  { href: "/audit",      label: "Kiem toan" },
 ];
 
 export default function NavBar() {
@@ -15,7 +15,7 @@ export default function NavBar() {
   return (
     <nav className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
       <div className="max-w-7xl mx-auto px-4 flex items-center gap-6 h-14">
-        <span className="font-bold text-blue-400 text-lg tracking-tight">BO Robot</span>
+        <span className="font-bold text-blue-400 text-lg tracking-tight">Robot BO</span>
         {NAV_LINKS.map((l) => (
           <Link
             key={l.href}

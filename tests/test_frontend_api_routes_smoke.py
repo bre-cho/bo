@@ -20,6 +20,8 @@ def test_frontend_wired_routes_exist_with_expected_methods():
         ("GET", "/status"),
         ("GET", "/stats"),
         ("GET", "/balance"),
+        ("GET", "/health/deriv"),
+        ("GET", "/health/deriv/history"),
         ("GET", "/logs"),
         ("GET", "/audit/logs"),
         ("GET", "/db/evolution"),

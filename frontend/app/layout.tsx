@@ -3,8 +3,8 @@ import "./globals.css";
 import NavBar from "@/components/NavBar";
 
 export const metadata: Metadata = {
-  title: "BO Trading Robot",
-  description: "Autonomous trading robot dashboard",
+  title: "Robot Giao Dich BO",
+  description: "Bang dieu khien robot giao dich tu dong",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
