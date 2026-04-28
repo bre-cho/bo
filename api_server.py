@@ -24,8 +24,11 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import redis
@@ -38,10 +41,9 @@ import config
 # ──────────────────────────────────────────────────────────────────
 
 try:
-    from fastapi import FastAPI, HTTPException, Depends, Query
+    from fastapi import FastAPI, HTTPException, Depends, Query, Request, Security
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import FileResponse
+    from fastapi.security import APIKeyHeader
     from pydantic import BaseModel
     _HAS_FASTAPI = True
 except ImportError:
@@ -70,6 +72,36 @@ if _HAS_FASTAPI:
     class ControlRequest(BaseModel):
         pass
 
+    class TradeLogWriteRequest(BaseModel):
+        symbol: str
+        direction: str
+        stake_usd: float
+        payout_usd: Optional[float] = None
+        result: Optional[str] = None
+        score: Optional[float] = None
+        strategy: Optional[str] = None
+        contract_id: Optional[str] = None
+        raw_json: Optional[Dict[str, Any]] = None
+
+    class ModelVersionWriteRequest(BaseModel):
+        model_name: str
+        version_tag: str
+        accuracy: Optional[float] = None
+        win_rate: Optional[float] = None
+        is_active: bool = False
+        metrics_json: Optional[Dict[str, Any]] = None
+        file_path: Optional[str] = None
+
+    class EvolutionRunWriteRequest(BaseModel):
+        genome_id: str
+        generation: int
+        fitness: float
+        win_rate_pct: Optional[float] = None
+        profit_factor: Optional[float] = None
+        n_trades: Optional[int] = None
+        promoted: bool = False
+        genes_json: Optional[Dict[str, Any]] = None
+
 
 # ──────────────────────────────────────────────────────────────────
 # App factory
@@ -79,10 +111,21 @@ def create_app():
     if not _HAS_FASTAPI:
         raise RuntimeError("FastAPI not installed. Run: pip install fastapi uvicorn")
 
+    # ── DB lifespan — init SQLite once at startup ─────────────────
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            from db.database import init_db
+            init_db()
+        except Exception as exc:
+            print(f"[DB] init_db warning: {exc}")
+        yield
+
     app = FastAPI(
         title       = "BO Trading Robot API",
         description = "Control panel for the autonomous trading system",
         version     = "2.0.0",
+        lifespan    = lifespan,
     )
 
     app.add_middleware(
@@ -93,11 +136,140 @@ def create_app():
         allow_headers     = ["*"],
     )
 
-    # ── Shared state via Redis ────────────────────────────────────
+    # ── Audit log middleware (mutating endpoints only) ────────────
+    _AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    @app.middleware("http")
+    async def audit_middleware(request: Request, call_next):
+        start = time.monotonic()
+        response = await call_next(request)
+        if request.method in _AUDIT_METHODS:
+            duration_ms = (time.monotonic() - start) * 1000
+            try:
+                from db.database import SessionLocal
+                from db.models import AuditLog
+                raw_key: str = request.headers.get("x-api-key", "") or ""
+                hint = (raw_key[:4] + "****") if len(raw_key) >= 4 else None
+                # Best-effort body capture (body already consumed by route)
+                entry = AuditLog(
+                    endpoint     = request.url.path,
+                    method       = request.method,
+                    status_code  = response.status_code,
+                    api_key_hint = hint,
+                    ip_address   = (request.client.host if request.client else None),
+                    duration_ms  = round(duration_ms, 2),
+                )
+                with SessionLocal() as db:
+                    db.add(entry)
+                    db.commit()
+            except Exception:
+                pass  # Never let audit failure break the response
+        return response
     _r = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB)
 
     def get_redis():
         return _r
+
+    # ── API key auth (controls + engine mutations) ────────────────
+    _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+    def _get_required_api_key() -> str:
+        """Read API key from env at call time (supports hot reload of .env)."""
+        key = os.environ.get("API_SECRET_KEY", "") or getattr(config, "API_SECRET_KEY", "")
+        return key
+
+    async def require_api_key(api_key: str = Security(_api_key_header)):
+        expected = _get_required_api_key()
+        if not expected or expected in ("", "changeme_in_env"):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "API key authentication not configured. "
+                    "Set API_SECRET_KEY in .env before using control endpoints."
+                ),
+            )
+        if not api_key or not secrets.compare_digest(api_key, expected):
+            raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key header")
+        return api_key
+
+    def _persist_trade_log(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert/update one trade log row in SQLite."""
+        from db.database import SessionLocal
+        from db.models import TradeLog
+
+        contract_id = payload.get("contract_id")
+        with SessionLocal() as db:
+            row = None
+            if contract_id:
+                row = db.query(TradeLog).filter(TradeLog.contract_id == contract_id).first()
+            if row is None:
+                row = TradeLog()
+                db.add(row)
+
+            row.symbol = str(payload.get("symbol") or "UNKNOWN")
+            row.direction = str(payload.get("direction") or "UNKNOWN")
+            row.stake_usd = float(payload.get("stake_usd") or 0.0)
+            row.payout_usd = payload.get("payout_usd")
+            row.result = payload.get("result")
+            row.score = payload.get("score")
+            row.strategy = payload.get("strategy")
+            row.contract_id = contract_id
+            row.raw_json = json.dumps(payload, ensure_ascii=False)
+
+            db.commit()
+            db.refresh(row)
+            return {"id": row.id, "contract_id": row.contract_id}
+
+    def _persist_model_version(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert one model version row; if active=True deactivate previous active versions."""
+        from db.database import SessionLocal
+        from db.models import ModelVersion
+
+        with SessionLocal() as db:
+            if payload.get("is_active"):
+                db.query(ModelVersion).filter(
+                    ModelVersion.model_name == payload["model_name"],
+                    ModelVersion.is_active.is_(True),
+                ).update({"is_active": False}, synchronize_session=False)
+
+            row = ModelVersion(
+                model_name=payload["model_name"],
+                version_tag=payload["version_tag"],
+                accuracy=payload.get("accuracy"),
+                win_rate=payload.get("win_rate"),
+                is_active=bool(payload.get("is_active", False)),
+                metrics_json=json.dumps(payload.get("metrics_json"), ensure_ascii=False)
+                if payload.get("metrics_json") is not None
+                else None,
+                file_path=payload.get("file_path"),
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return {"id": row.id, "model_name": row.model_name, "version_tag": row.version_tag}
+
+    def _persist_evolution_run(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert one evolution run row in SQLite."""
+        from db.database import SessionLocal
+        from db.models import EvolutionRun
+
+        with SessionLocal() as db:
+            row = EvolutionRun(
+                genome_id=payload["genome_id"],
+                generation=int(payload["generation"]),
+                fitness=float(payload["fitness"]),
+                win_rate_pct=payload.get("win_rate_pct"),
+                profit_factor=payload.get("profit_factor"),
+                n_trades=payload.get("n_trades"),
+                promoted=bool(payload.get("promoted", False)),
+                genes_json=json.dumps(payload.get("genes_json"), ensure_ascii=False)
+                if payload.get("genes_json") is not None
+                else None,
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return {"id": row.id, "genome_id": row.genome_id, "generation": row.generation}
 
     # ── Lazy component init ───────────────────────────────────────
     _components: dict = {}
@@ -136,21 +308,9 @@ def create_app():
             )
         return _components["llm"]
 
-    # ── Serve static frontend ─────────────────────────────────────
-    frontend_dir = os.path.join(os.path.dirname(__file__), "frontend")
-    if os.path.isdir(frontend_dir):
-        app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
-
-        @app.get("/", include_in_schema=False)
-        async def root():
-            index_path = os.path.join(frontend_dir, "index.html")
-            if os.path.exists(index_path):
-                return FileResponse(index_path)
-            return {"status": "BO Trading Robot API", "docs": "/docs"}
-    else:
-        @app.get("/", include_in_schema=False)
-        async def root():
-            return {"status": "BO Trading Robot API", "docs": "/docs"}
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return {"status": "BO Trading Robot API", "docs": "/docs"}
 
     # ── Status ────────────────────────────────────────────────────
     @app.get("/status")
@@ -181,6 +341,7 @@ def create_app():
     async def get_logs(
         page: int = Query(1, ge=1),
         size: int = Query(20, ge=1, le=100),
+        persist_db: bool = Query(False, description="Also persist returned records into SQLite trade_logs"),
         r: redis.Redis = Depends(get_redis),
     ):
         # Đọc đúng window cần thiết thay vì toàn bộ danh sách
@@ -191,6 +352,24 @@ def create_app():
         end      = start + size - 1      # lrange end là inclusive
         raw_list = r.lrange(config.REDIS_LOG_KEY, start, end)
         records  = [json.loads(x) for x in raw_list]
+
+        if persist_db:
+            persisted, failed = 0, 0
+            for rec in records:
+                try:
+                    _persist_trade_log(rec)
+                    persisted += 1
+                except Exception:
+                    failed += 1
+            return {
+                "total"     : total,
+                "page"      : page,
+                "size"      : size,
+                "records"   : records,
+                "persisted" : persisted,
+                "failed"    : failed,
+            }
+
         return {
             "total"  : total,
             "page"   : page,
@@ -210,35 +389,35 @@ def create_app():
 
     # ── Control: Daily TP ─────────────────────────────────────────
     @app.post("/control/tp")
-    async def set_daily_tp(req: DailyLimitRequest):
+    async def set_daily_tp(req: DailyLimitRequest, _: str = Depends(require_api_key)):
         ctrl = get_control()
         ctrl.set_daily_tp(req.amount_usd)
         return {"status": "ok", "daily_take_profit_usd": req.amount_usd}
 
     # ── Control: Daily SL ─────────────────────────────────────────
     @app.post("/control/sl")
-    async def set_daily_sl(req: DailyLimitRequest):
+    async def set_daily_sl(req: DailyLimitRequest, _: str = Depends(require_api_key)):
         ctrl = get_control()
         ctrl.set_daily_sl(req.amount_usd)
         return {"status": "ok", "daily_stop_loss_usd": req.amount_usd}
 
     # ── Control: Wave filter ──────────────────────────────────────
     @app.post("/control/wave")
-    async def set_wave_filter(req: WaveFilterRequest):
+    async def set_wave_filter(req: WaveFilterRequest, _: str = Depends(require_api_key)):
         ctrl = get_control()
         ctrl.set_wave_filter(req.mode)
         return {"status": "ok", "wave_direction_filter": req.mode}
 
     # ── Control: Restart after TP/SL stop ────────────────────────
     @app.post("/control/restart")
-    async def restart_after_stop():
+    async def restart_after_stop(_: str = Depends(require_api_key)):
         ctrl = get_control()
         ctrl.reset_daily_stop()
         return {"status": "ok", "message": "Đã khởi động lại — tiếp tục giao dịch"}
 
     # ── Capital Strategy ──────────────────────────────────────────
     @app.post("/strategy")
-    async def set_strategy(req: StrategyRequest):
+    async def set_strategy(req: StrategyRequest, _: str = Depends(require_api_key)):
         allowed = {"fixed_fractional","martingale","anti_martingale","victor2","victor3","victor4"}
         if req.name not in allowed:
             raise HTTPException(status_code=400, detail=f"Strategy must be one of {sorted(allowed)}")
@@ -247,18 +426,18 @@ def create_app():
         return {"status": "ok", "strategy": req.name, "base_stake": req.base_stake}
 
     @app.post("/strategy/reset")
-    async def reset_strategy():
+    async def reset_strategy(_: str = Depends(require_api_key)):
         get_cap_strat().reset()
         return {"status": "ok", "message": "Strategy state reset"}
 
     # ── Engine control (via Redis signals) ───────────────────────
     @app.post("/engine/pause")
-    async def pause_engine(r: redis.Redis = Depends(get_redis)):
+    async def pause_engine(r: redis.Redis = Depends(get_redis), _: str = Depends(require_api_key)):
         r.set("Deriv_EngineMode", "PAPER")
         return {"status": "ok", "engine_mode": "PAPER"}
 
     @app.post("/engine/resume")
-    async def resume_engine(r: redis.Redis = Depends(get_redis)):
+    async def resume_engine(r: redis.Redis = Depends(get_redis), _: str = Depends(require_api_key)):
         r.set("Deriv_EngineMode", "LIVE")
         return {"status": "ok", "engine_mode": "LIVE"}
 
@@ -295,10 +474,39 @@ def create_app():
 
     # ── Model registry ────────────────────────────────────────────
     @app.get("/models/registry")
-    async def models_registry():
+    async def models_registry(
+        persist_db: bool = Query(False, description="Also persist versions to SQLite model_versions"),
+    ):
         from model_registry import ModelRegistry
         reg = ModelRegistry()
-        return {"report": reg.report(), "versions": reg._state.versions[-20:]}
+        versions = reg._state.versions[-20:]
+
+        if persist_db:
+            persisted, failed = 0, 0
+            for v in versions:
+                try:
+                    _persist_model_version(
+                        {
+                            "model_name" : str(v.get("model_name", "unknown")),
+                            "version_tag": str(v.get("version", v.get("version_tag", "unknown"))),
+                            "accuracy"   : v.get("accuracy"),
+                            "win_rate"   : v.get("win_rate"),
+                            "is_active"  : bool(v.get("is_active", False)),
+                            "metrics_json": v,
+                            "file_path"  : v.get("path"),
+                        }
+                    )
+                    persisted += 1
+                except Exception:
+                    failed += 1
+            return {
+                "report"    : reg.report(),
+                "versions"  : versions,
+                "persisted" : persisted,
+                "failed"    : failed,
+            }
+
+        return {"report": reg.report(), "versions": versions}
 
     # ── Synthetic Engine ──────────────────────────────────────────
     class SyntheticTrainRequest(BaseModel):
@@ -379,9 +587,28 @@ def create_app():
                 seed        = req.seed,
                 verbose     = False,
             )
+
+            persisted = None
+            try:
+                persisted = _persist_evolution_run(
+                    {
+                        "genome_id"    : champion.genome_id,
+                        "generation"   : champion.generation,
+                        "fitness"      : champion.fitness,
+                        "win_rate_pct" : champion.win_rate_pct,
+                        "profit_factor": champion.profit_factor,
+                        "n_trades"     : champion.n_trades,
+                        "promoted"     : False,
+                        "genes_json"   : champion.genes(),
+                    }
+                )
+            except Exception:
+                persisted = None
+
             return {
                 "status"    : "ok",
                 "message"   : "Evolution complete",
+                "persisted" : persisted,
                 "champion"  : {
                     "genome_id"         : champion.genome_id,
                     "generation"        : champion.generation,
@@ -429,16 +656,36 @@ def create_app():
             raise HTTPException(status_code=500, detail=str(exc))
 
     @app.post("/evolution/promote")
-    async def evolution_promote():
+    async def evolution_promote(_: str = Depends(require_api_key)):
         """Apply current champion genome params to live config."""
         try:
             from evolution_engine import apply_champion_to_config
             champion = apply_champion_to_config()
             if champion is None:
                 return {"status": "no_champion", "applied": False}
+
+            db_updated = False
+            try:
+                from db.database import SessionLocal
+                from db.models import EvolutionRun
+                with SessionLocal() as db:
+                    row = (
+                        db.query(EvolutionRun)
+                        .filter(EvolutionRun.genome_id == champion.genome_id)
+                        .order_by(EvolutionRun.id.desc())
+                        .first()
+                    )
+                    if row is not None:
+                        row.promoted = True
+                        db.commit()
+                        db_updated = True
+            except Exception:
+                db_updated = False
+
             return {
                 "status"           : "ok",
                 "applied"          : True,
+                "db_updated"       : db_updated,
                 "min_signal_score" : config.MIN_SIGNAL_SCORE,
                 "rsi_oversold"     : config.RSI_OVERSOLD,
                 "rsi_overbought"   : config.RSI_OVERBOUGHT,
@@ -446,6 +693,41 @@ def create_app():
                 "genome_id"        : champion.genome_id,
                 "fitness"          : champion.fitness,
             }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── DB write endpoints (real data persistence) ───────────────
+
+    @app.post("/db/trade_logs")
+    async def db_write_trade_log(
+        req: TradeLogWriteRequest,
+        _: str = Depends(require_api_key),
+    ):
+        try:
+            out = _persist_trade_log(req.model_dump())
+            return {"status": "ok", "saved": out}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/db/model_versions")
+    async def db_write_model_version(
+        req: ModelVersionWriteRequest,
+        _: str = Depends(require_api_key),
+    ):
+        try:
+            out = _persist_model_version(req.model_dump())
+            return {"status": "ok", "saved": out}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/db/evolution_runs")
+    async def db_write_evolution_run(
+        req: EvolutionRunWriteRequest,
+        _: str = Depends(require_api_key),
+    ):
+        try:
+            out = _persist_evolution_run(req.model_dump())
+            return {"status": "ok", "saved": out}
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
@@ -938,7 +1220,7 @@ def create_app():
         shadow_mode: bool
 
     @app.post("/sovereign/mode")
-    async def sovereign_set_mode(req: SovereignModeRequest):
+    async def sovereign_set_mode(req: SovereignModeRequest, _: str = Depends(require_api_key)):
         """
         Toggle SSOL shadow mode.
 
@@ -1084,7 +1366,7 @@ def create_app():
         dry_run: bool
 
     @app.post("/evolution/aee/mode")
-    async def aee_set_mode(req: AEEModeRequest):
+    async def aee_set_mode(req: AEEModeRequest, _: str = Depends(require_api_key)):
         """
         Toggle AEE dry-run mode.
 
@@ -1102,10 +1384,170 @@ def create_app():
             ),
         }
 
-    # ── Health check ──────────────────────────────────────────────
+    # ── Deriv credential check ────────────────────────────────────
+    @app.get("/deriv/check")
+    async def deriv_check():
+        """
+        Lightweight Deriv credential check.
+        Does NOT place trades. Verifies token is set and non-empty.
+        Returns ws_url and whether token meets minimum length.
+        """
+        token = config.DERIV_API_TOKEN
+        configured = bool(token and len(token) >= 8)
+        return {
+            "configured": configured,
+            "app_id"    : config.DERIV_APP_ID,
+            "ws_url"    : config.DERIV_WS_URL,
+            "token_hint": (token[:4] + "****") if configured else None,
+            "detail"    : (
+                "Token present — use /balance to confirm live connectivity"
+                if configured
+                else "DERIV_API_TOKEN not set or too short. Add it to .env"
+            ),
+        }
+
+    # ── Audit log query (read) ────────────────────────────────────
+    @app.get("/audit/logs")
+    async def audit_logs_endpoint(
+        page    : int = Query(1, ge=1),
+        size    : int = Query(50, ge=1, le=200),
+        endpoint: str = Query("", description="Filter by endpoint prefix"),
+    ):
+        """Return paginated audit log from SQLite."""
+        try:
+            from db.database import SessionLocal
+            from db.models import AuditLog
+            with SessionLocal() as db:
+                q = db.query(AuditLog)
+                if endpoint:
+                    q = q.filter(AuditLog.endpoint.like(f"{endpoint}%"))
+                total = q.count()
+                rows  = (
+                    q.order_by(AuditLog.id.desc())
+                     .offset((page - 1) * size)
+                     .limit(size)
+                     .all()
+                )
+            records = [
+                {
+                    "id"          : r.id,
+                    "created_at"  : r.created_at.isoformat() if r.created_at else None,
+                    "endpoint"    : r.endpoint,
+                    "method"      : r.method,
+                    "status_code" : r.status_code,
+                    "api_key_hint": r.api_key_hint,
+                    "ip_address"  : r.ip_address,
+                    "duration_ms" : r.duration_ms,
+                }
+                for r in rows
+            ]
+            return {"total": total, "page": page, "size": size, "records": records}
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+    @app.get("/db/evolution")
+    async def db_evolution_history(
+        page : int = Query(1, ge=1),
+        size : int = Query(20, ge=1, le=100),
+    ):
+        """Return evolution run history from SQLite."""
+        try:
+            from db.database import SessionLocal
+            from db.models import EvolutionRun
+            with SessionLocal() as db:
+                total = db.query(EvolutionRun).count()
+                rows  = (
+                    db.query(EvolutionRun)
+                      .order_by(EvolutionRun.id.desc())
+                      .offset((page - 1) * size)
+                      .limit(size)
+                      .all()
+                )
+            records = [
+                {
+                    "id"           : r.id,
+                    "created_at"   : r.created_at.isoformat() if r.created_at else None,
+                    "genome_id"    : r.genome_id,
+                    "generation"   : r.generation,
+                    "fitness"      : r.fitness,
+                    "win_rate_pct" : r.win_rate_pct,
+                    "profit_factor": r.profit_factor,
+                    "n_trades"     : r.n_trades,
+                    "promoted"     : r.promoted,
+                }
+                for r in rows
+            ]
+            return {"total": total, "page": page, "size": size, "records": records}
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+    # ── Health check (deep) ───────────────────────────────────────
     @app.get("/health")
-    async def health():
-        return {"status": "ok"}
+    async def health(r: redis.Redis = Depends(get_redis)):
+        checks: dict = {}
+        overall = "ok"
+
+        # 1. Redis
+        try:
+            r.ping()
+            checks["redis"] = {"status": "ok"}
+        except Exception as exc:
+            checks["redis"] = {"status": "error", "detail": str(exc)}
+            overall = "degraded"
+
+        # 2. Deriv API token configured
+        deriv_token = config.DERIV_API_TOKEN
+        if deriv_token and len(deriv_token) >= 8:
+            checks["deriv_token"] = {"status": "configured"}
+        else:
+            checks["deriv_token"] = {
+                "status": "missing",
+                "detail": "DERIV_API_TOKEN not set in environment",
+            }
+            overall = "degraded"
+
+        # 3. Model files (champion genome + gene pool)
+        model_files = {
+            "gene_pool"    : os.path.join("models", "gene_pool.json"),
+            "meta_report"  : os.path.join("models", "meta_report.json"),
+            "causal_report": os.path.join("models", "causal_report.json"),
+        }
+        model_status: dict = {}
+        for name, path in model_files.items():
+            exists = os.path.exists(path)
+            model_status[name] = "ok" if exists else "missing"
+            if not exists:
+                overall = "degraded"
+        checks["model_files"] = model_status
+
+        # 4. Storage / vector store
+        vs_file = getattr(config, "VECTOR_STORE_FILE", "vector_store.json")
+        checks["vector_store"] = {
+            "status": "ok" if os.path.exists(vs_file) else "missing"
+        }
+
+        # 5. SQLite DB
+        try:
+            from db.database import SessionLocal
+            from db.models import AuditLog
+            with SessionLocal() as db:
+                db.query(AuditLog).limit(1).all()
+            checks["sqlite"] = {"status": "ok", "path": os.environ.get("SQLITE_DB_PATH", "bo_trading.db")}
+        except Exception as exc:
+            checks["sqlite"] = {"status": "error", "detail": str(exc)}
+            overall = "degraded"
+
+        # 6. Engine mode from Redis
+        try:
+            mode_raw = r.get("Deriv_EngineMode")
+            checks["engine_mode"] = {
+                "status": "ok",
+                "mode"  : mode_raw.decode() if mode_raw else "UNKNOWN",
+            }
+        except Exception:
+            checks["engine_mode"] = {"status": "unavailable"}
+
+        return {"status": overall, "checks": checks}
 
     # ── Operator manifest & validation ────────────────────────────
     @app.get("/operator/manifest")
@@ -1121,7 +1563,7 @@ def create_app():
 
     # ── Engine: stop ──────────────────────────────────────────────
     @app.post("/engine/stop")
-    async def stop_engine(r: redis.Redis = Depends(get_redis)):
+    async def stop_engine(r: redis.Redis = Depends(get_redis), _: str = Depends(require_api_key)):
         r.set("Deriv_EngineMode", "STOPPED")
         return {"status": "stopped"}
 
@@ -1152,7 +1594,7 @@ def create_app():
         }
 
     @app.post("/engine/promote")
-    async def promote_to_live(r: redis.Redis = Depends(get_redis)):
+    async def promote_to_live(r: redis.Redis = Depends(get_redis), _: str = Depends(require_api_key)):
         """Chuyển engine từ PAPER sang LIVE (yêu cầu đủ paper trades)."""
         paper_count = r.llen("Deriv_Paper_Log")
         promote_min = getattr(config, "PAPER_PROMOTE_MIN_TRADES", 50)

@@ -1,4 +1,12 @@
 __pycache__/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+frontend/.next/
+frontend/node_modules/
+frontend/*.tsbuildinfo
+
 .env
 *.pdf
 

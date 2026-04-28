@@ -5,6 +5,9 @@ set -euo pipefail
 echo "Running compile check..."
 python -m compileall .
 
+echo "Running DB migrations..."
+alembic upgrade head
+
 echo "Running API..."
 uvicorn api_server:create_app --factory --host 127.0.0.1 --port 8000 >/tmp/bo_verify_system.log 2>&1 &
 server_pid=$!
