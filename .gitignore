@@ -9,4 +9,5 @@ frontend/*.tsbuildinfo
 
 .env
 *.pdf
+trade_log.csv
 
