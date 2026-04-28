@@ -48,8 +48,11 @@ else:
     DERIV_API_TOKEN = (DERIV_API_TOKEN_DEMO or _DERIV_API_TOKEN_LEGACY).strip()
     DERIV_TOKEN_SOURCE = "demo" if DERIV_API_TOKEN_DEMO.strip() else ("legacy" if _DERIV_API_TOKEN_LEGACY.strip() else "missing")
 
-DERIV_APP_ID    = _env_int("DERIV_APP_ID", 1089)  # App ID lấy từ .env
-DERIV_WS_URL    = f"wss://ws.binaryws.com/websockets/v3?app_id={DERIV_APP_ID}"
+DERIV_APP_ID = os.getenv("DERIV_APP_ID", "1089")
+DERIV_WS_URL = os.getenv(
+    "DERIV_WS_URL",
+    f"wss://ws.derivws.com/websockets/v3?app_id={DERIV_APP_ID}",
+)
 
 # Khóa an toàn live-trading: mặc định fail-closed.
 LIVE_TRADING_ENABLED = _env_bool("LIVE_TRADING_ENABLED", False)

@@ -14,6 +14,7 @@ API tham khảo: https://api.deriv.com/
 
 import asyncio
 import json
+import os
 import time
 from datetime import datetime
 from typing import Optional
@@ -78,6 +79,10 @@ def invalidate_balance_cache() -> None:
     """Xoá cache số dư — gọi sau khi đặt lệnh thật."""
     _balance_cache["value"] = None
     _balance_cache["ts"]    = 0.0
+
+
+def _live_trade_allowed() -> bool:
+    return os.getenv("TRADE_MODE", "PAPER").strip().upper() == "LIVE"
 
 
 # ------------------------------------------------------------------
@@ -297,6 +302,18 @@ def place_and_wait(contract_type: str,
     -------
     dict kết quả (xem _place_and_wait_async)
     """
+    if not _live_trade_allowed():
+        return {
+            "contract_id": "PAPER_BLOCKED",
+            "won"        : False,
+            "buy_price"  : 0.0,
+            "sell_price" : 0.0,
+            "payout"     : 0.0,
+            "pnl"        : 0.0,
+            "status"     : "blocked",
+            "reason"     : "TRADE_MODE is not LIVE",
+        }
+
     result = asyncio.run(_place_and_wait_async(contract_type, symbol, stake))
     # Balance đã thay đổi sau khi đặt lệnh — xoá cache để cycle tiếp lấy lại
     invalidate_balance_cache()

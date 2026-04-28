@@ -26,6 +26,7 @@ Bạn chỉ cần giám sát. Hệ thống tự quyết định tất cả.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from datetime import datetime
@@ -221,7 +222,12 @@ class DecisionEngine:
                 return SystemMode(raw.decode())
             except Exception:
                 pass
-        return SystemMode.LIVE
+
+        default_mode = os.getenv("ENGINE_MODE", "PAPER").strip().upper()
+        try:
+            return SystemMode(default_mode)
+        except Exception:
+            return SystemMode.PAPER
 
     def _save_mode(self, mode: SystemMode) -> None:
         self._r.set(_REDIS_MODE_KEY, mode.value)

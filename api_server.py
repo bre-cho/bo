@@ -383,8 +383,8 @@ def create_app():
     @app.get("/balance")
     async def get_balance_endpoint():
         try:
-            from deriv_trade import get_balance
-            bal = get_balance()
+            from deriv_trade import _get_balance_async
+            bal = await _get_balance_async()
             return {"balance": bal, "currency": config.TRADE_CURRENCY}
         except Exception as exc:
             raise HTTPException(status_code=503, detail=str(exc))
